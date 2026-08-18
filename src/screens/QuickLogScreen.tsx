@@ -73,10 +73,15 @@ export default function QuickLogScreen() {
   const canLog = hasValidAmount && category !== null;
   const showCategoryPrompt = amountBlurred && hasValidAmount && category === null;
 
-  const handleLog = async () => {
+  const handleLog = () => {
     if (!canLog || category === null) return;
     const loggedAmount = amountValue;
-    await addTransaction({ amount: amountValue, category, note });
+    const loggedCategory = category;
+    const loggedNote = note;
+
+    // Reset and refocus synchronously within this tap's event handler — mobile browsers
+    // only reopen the soft keyboard for a focus() call made in the same gesture, not after
+    // an awaited async gap.
     setAmountText('');
     setNote('');
     setCategory(null);
@@ -87,6 +92,8 @@ export default function QuickLogScreen() {
     setToastMessage(`${formatPeso(loggedAmount)} added successfully`);
     setToastVisible(true);
     toastTimeoutRef.current = setTimeout(() => setToastVisible(false), 2200);
+
+    addTransaction({ amount: loggedAmount, category: loggedCategory, note: loggedNote });
   };
 
   return (
