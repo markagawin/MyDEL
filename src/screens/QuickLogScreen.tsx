@@ -41,8 +41,10 @@ export default function QuickLogScreen() {
   const amountInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    amountInputRef.current?.focus();
-  }, []);
+    if (category !== null) {
+      amountInputRef.current?.focus();
+    }
+  }, [category]);
 
   const cycleLabel = currentCycleRange.label;
 
@@ -59,7 +61,6 @@ export default function QuickLogScreen() {
   const amountValue = parseFloat(amountText);
   const hasValidAmount = !Number.isNaN(amountValue) && amountValue > 0;
   const canLog = hasValidAmount && category !== null;
-  const showCategoryHint = hasValidAmount && category === null;
 
   const handleLog = async () => {
     if (!canLog || category === null) return;
@@ -139,19 +140,25 @@ export default function QuickLogScreen() {
           </View>
 
           <Text style={styles.fieldLabel}>AMOUNT</Text>
-          <View style={styles.amountWrap}>
-            <Text style={styles.pesoSign}>₱</Text>
+          <View style={[styles.amountWrap, category === null && styles.amountWrapDisabled]}>
+            <Text style={[styles.pesoSign, category === null && styles.pesoSignDisabled]}>₱</Text>
             <TextInput
               ref={amountInputRef}
               style={styles.amountInput}
               value={amountText}
               onChangeText={(v) => setAmountText(v.replace(/[^0-9.]/g, ''))}
-              placeholder="0.00"
+              editable={category !== null}
+              placeholder={category === null ? 'Pick a category first' : '0.00'}
               placeholderTextColor={theme.textMuted}
               keyboardType="decimal-pad"
               maxLength={10}
             />
           </View>
+          {category === null && (
+            <Text style={styles.categoryHint}>
+              👇 Select a category below to enter an amount
+            </Text>
+          )}
 
           <View style={styles.grid}>
             {categories.map((cat) => {
@@ -180,10 +187,6 @@ export default function QuickLogScreen() {
               <Text style={styles.addTileLabel}>Add</Text>
             </Pressable>
           </View>
-
-          {showCategoryHint && (
-            <Text style={styles.categoryHint}>⚠️ Select a category to log this entry</Text>
-          )}
 
           <Text style={styles.fieldLabelMuted}>NOTE (OPTIONAL)</Text>
           <View style={styles.noteWrap}>
@@ -301,9 +304,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
     paddingVertical: 22,
-    marginBottom: 20,
+    marginBottom: 8,
   },
+  amountWrapDisabled: { backgroundColor: theme.background },
   pesoSign: { fontSize: 36, fontWeight: '700', color: theme.navy, marginRight: 6 },
+  pesoSignDisabled: { color: theme.textMuted },
   amountInput: {
     fontSize: 44,
     fontWeight: '800',
@@ -340,9 +345,9 @@ const styles = StyleSheet.create({
   categoryHint: {
     fontSize: 12.5,
     fontWeight: '600',
-    color: theme.danger,
-    marginTop: -6,
+    color: theme.textMuted,
     marginBottom: 16,
+    textAlign: 'center',
   },
   addTile: {
     borderStyle: 'dashed',
