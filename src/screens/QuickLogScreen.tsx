@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
 import { CategoryKey } from '../types';
 import { formatPeso } from '../currency';
@@ -21,6 +21,7 @@ import AddCategoryModal from '../components/AddCategoryModal';
 
 export default function QuickLogScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const {
     transactions,
     currentCycleIdentifier,
@@ -56,7 +57,9 @@ export default function QuickLogScreen() {
     currentPaycheck !== null && currentPaycheck > 0 ? (periodTotal / currentPaycheck) * 100 : 0;
 
   const amountValue = parseFloat(amountText);
-  const canLog = !Number.isNaN(amountValue) && amountValue > 0 && category !== null;
+  const hasValidAmount = !Number.isNaN(amountValue) && amountValue > 0;
+  const canLog = hasValidAmount && category !== null;
+  const showCategoryHint = hasValidAmount && category === null;
 
   const handleLog = async () => {
     if (!canLog || category === null) return;
@@ -178,6 +181,10 @@ export default function QuickLogScreen() {
             </Pressable>
           </View>
 
+          {showCategoryHint && (
+            <Text style={styles.categoryHint}>⚠️ Select a category to log this entry</Text>
+          )}
+
           <Text style={styles.fieldLabelMuted}>NOTE (OPTIONAL)</Text>
           <View style={styles.noteWrap}>
             <Text style={styles.noteIcon}>📝</Text>
@@ -190,6 +197,9 @@ export default function QuickLogScreen() {
             />
           </View>
 
+        </ScrollView>
+
+        <View style={[styles.floatingFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
           <TouchableOpacity
             style={[styles.logButton, !canLog && styles.logButtonDisabled]}
             disabled={!canLog}
@@ -197,7 +207,7 @@ export default function QuickLogScreen() {
           >
             <Text style={styles.logButtonText}>{flash ?? 'Log Entry'}</Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
 
       <PaycheckModal
@@ -219,7 +229,7 @@ export default function QuickLogScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: 20, paddingBottom: 24 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -327,6 +337,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tileLabelSelected: { color: '#FFFFFF' },
+  categoryHint: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: theme.danger,
+    marginTop: -6,
+    marginBottom: 16,
+  },
   addTile: {
     borderStyle: 'dashed',
     backgroundColor: theme.background,
@@ -348,6 +365,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     color: theme.text,
+  },
+  floatingFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: theme.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 10,
   },
   logButton: {
     backgroundColor: theme.navy,
