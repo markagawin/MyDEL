@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
 import { formatPeso } from '../currency';
-import { endOfDay, formatTimeOfDay, startOfDay } from '../cycleEngine';
+import { endOfDay, formatShortDate, formatTimeOfDay, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
 import { AppTheme, useTheme } from '../theme';
 import DonutChart from '../components/DonutChart';
@@ -190,9 +190,14 @@ export default function SummaryScreen() {
                   <View style={styles.entryList}>
                     {entries.map((tx) => (
                       <View key={tx.id} style={styles.entryRow}>
-                        <Text style={styles.entryTime}>
-                          {formatTimeOfDay(new Date(tx.timestamp))}
-                        </Text>
+                        <View style={styles.entryTimeCol}>
+                          <Text style={styles.entryDate}>
+                            {formatShortDate(new Date(tx.timestamp))}
+                          </Text>
+                          <Text style={styles.entryTime}>
+                            {formatTimeOfDay(new Date(tx.timestamp))}
+                          </Text>
+                        </View>
                         <Text style={styles.entryNote} numberOfLines={1}>
                           {tx.note ?? '—'}
                         </Text>
@@ -300,7 +305,9 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  entryTime: { fontSize: 11, color: theme.textMuted, width: 70 },
+  entryTimeCol: { width: 60, marginRight: 4 },
+  entryDate: { fontSize: 10.5, fontWeight: '600', color: theme.textMuted },
+  entryTime: { fontSize: 10.5, color: theme.textMuted, marginTop: 1 },
   entryNote: { fontSize: 12.5, color: theme.text, flex: 1, marginRight: 8 },
   entryAmount: { fontSize: 12.5, fontWeight: '700', color: theme.text },
   emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center', marginTop: 20 },

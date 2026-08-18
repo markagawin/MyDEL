@@ -196,6 +196,10 @@ export function formatFullDate(date: Date): string {
   return `${MONTH_ABBR[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
+export function formatShortDate(date: Date): string {
+  return shortLabel(date);
+}
+
 /** Parses a plain "yyyy-MM-dd" date-only string (as opposed to a full ISO timestamp) at local midnight. */
 export function parseIsoDateOnly(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number);
