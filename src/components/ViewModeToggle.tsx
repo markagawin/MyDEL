@@ -33,7 +33,7 @@ export default function ViewModeToggle({ mode, onChange }: Props) {
 const createStyles = (theme: AppTheme) => StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    backgroundColor: theme.background,
+    backgroundColor: theme.surfaceMuted,
     borderRadius: 12,
     padding: 3,
     marginBottom: 12,

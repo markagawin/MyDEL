@@ -81,7 +81,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: theme.success,
-    backgroundColor: theme.background,
+    backgroundColor: theme.successSurface,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,

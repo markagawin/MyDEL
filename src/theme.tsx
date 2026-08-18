@@ -12,6 +12,10 @@ const lightColors = {
   textMuted: '#6B7280',
   danger: '#EF4444',
   success: '#10B981',
+  surfaceMuted: '#EAEEF6',
+  disabled: '#B7C2D6',
+  dangerSurface: '#FCEBEB',
+  successSurface: '#E6F7F0',
 };
 
 const darkColors = {
@@ -24,6 +28,10 @@ const darkColors = {
   textMuted: '#98A2B8',
   danger: '#F87171',
   success: '#34D399',
+  surfaceMuted: '#141928',
+  disabled: '#3A4258',
+  dangerSurface: '#3A2020',
+  successSurface: '#1A2E24',
 };
 
 export type AppTheme = typeof lightColors;

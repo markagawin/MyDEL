@@ -359,7 +359,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   noteWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.background,
+    backgroundColor: theme.surfaceMuted,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 4,
@@ -390,6 +390,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  logButtonDisabled: { backgroundColor: theme.border },
+  logButtonDisabled: { backgroundColor: theme.disabled },
   logButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
 });

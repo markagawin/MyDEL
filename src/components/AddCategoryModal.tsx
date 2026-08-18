@@ -143,7 +143,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   softCapWarning: {
     fontSize: 12,
     color: theme.danger,
-    backgroundColor: theme.background,
+    backgroundColor: theme.dangerSurface,
     borderRadius: 10,
     padding: 10,
     marginBottom: 14,
@@ -216,6 +216,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 10,
   },
-  saveButtonDisabled: { backgroundColor: theme.border },
+  saveButtonDisabled: { backgroundColor: theme.disabled },
   saveButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 });
