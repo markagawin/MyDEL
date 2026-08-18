@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -10,7 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Text } from 'react-native';
+import { Animated, StyleSheet, Text } from 'react-native';
 
 import { AppDataProvider, useAppData } from './src/AppDataContext';
 import QuickLogScreen from './src/screens/QuickLogScreen';
@@ -20,7 +20,8 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import SplashScreen from './src/components/SplashScreen';
 import { ThemeProvider, useIsDarkTheme, useTheme } from './src/theme';
 
-const MIN_SPLASH_MS = 1200;
+const MIN_SPLASH_MS = 2000;
+const SPLASH_FADE_MS = 500;
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -55,11 +56,27 @@ function AppInner() {
   const isDark = useIsDarkTheme();
   const { loading } = useAppData();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const splashOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), MIN_SPLASH_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  const ready = !loading && minTimeElapsed;
+
+  useEffect(() => {
+    if (ready) {
+      Animated.timing(splashOpacity, {
+        toValue: 0,
+        duration: SPLASH_FADE_MS,
+        useNativeDriver: true,
+      }).start();
+      const timer = setTimeout(() => setShowSplash(false), SPLASH_FADE_MS);
+      return () => clearTimeout(timer);
+    }
+  }, [ready]);
 
   const navigationTheme = {
     ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme),
@@ -73,27 +90,28 @@ function AppInner() {
     },
   };
 
-  if (loading || !minTimeElapsed) {
-    return (
-      <>
-        <SplashScreen />
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-      </>
-    );
-  }
-
   return (
     <>
-      <NavigationContainer theme={navigationTheme}>
-        <RootStack.Navigator screenOptions={{ headerShown: false }}>
-          <RootStack.Screen name="Tabs" component={Tabs} />
-          <RootStack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{ headerShown: true, title: 'Settings', presentation: 'modal' }}
-          />
-        </RootStack.Navigator>
-      </NavigationContainer>
+      {ready && (
+        <NavigationContainer theme={navigationTheme}>
+          <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            <RootStack.Screen name="Tabs" component={Tabs} />
+            <RootStack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{ headerShown: true, title: 'Settings', presentation: 'modal' }}
+            />
+          </RootStack.Navigator>
+        </NavigationContainer>
+      )}
+      {showSplash && (
+        <Animated.View
+          pointerEvents={ready ? 'none' : 'auto'}
+          style={[StyleSheet.absoluteFill, { opacity: splashOpacity }]}
+        >
+          <SplashScreen />
+        </Animated.View>
+      )}
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </>
   );
