@@ -1,0 +1,305 @@
+import React, { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAppData } from '../AppDataContext';
+import { formatPeso } from '../currency';
+import { endOfDay, formatTimeOfDay, startOfDay } from '../cycleEngine';
+import { getAvailableCycles } from '../cycleList';
+import { theme } from '../theme';
+import DonutChart from '../components/DonutChart';
+import CyclePickerModal from '../components/CyclePickerModal';
+import CustomRangeBar from '../components/CustomRangeBar';
+import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
+import { CategoryKey, Transaction } from '../types';
+
+export default function SummaryScreen() {
+  const { transactions, currentCycleIdentifier, currentCycleRange, categories } = useAppData();
+  const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('cycle');
+  const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
+  const [customEnd, setCustomEnd] = useState<Date>(new Date());
+
+  const cycleOptions = useMemo(
+    () => getAvailableCycles(transactions, currentCycleRange),
+    [transactions, currentCycleRange]
+  );
+  const activeOption = cycleOptions.find((o) => o.identifier === selectedCycle) ?? cycleOptions[0];
+
+  const inRange = useMemo(() => {
+    if (viewMode === 'cycle') {
+      return (t: Transaction) => t.cycleIdentifier === selectedCycle;
+    }
+    const from = startOfDay(customStart).getTime();
+    const to = endOfDay(customEnd).getTime();
+    return (t: Transaction) => {
+      const time = new Date(t.timestamp).getTime();
+      return time >= from && time <= to;
+    };
+  }, [viewMode, selectedCycle, customStart, customEnd]);
+
+  const breakdown = useMemo(() => {
+    const totals = new Map<CategoryKey, number>();
+    for (const tx of transactions) {
+      if (!inRange(tx)) continue;
+      totals.set(tx.category, (totals.get(tx.category) ?? 0) + tx.amount);
+    }
+    const total = Array.from(totals.values()).reduce((s, v) => s + v, 0);
+    const rows = categories
+      .map((meta) => ({
+        meta,
+        amount: totals.get(meta.key) ?? 0,
+      }))
+      .filter((r) => r.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+    return { rows, total };
+  }, [transactions, inRange, categories]);
+
+  const entriesByCategory = useMemo(() => {
+    const map = new Map<CategoryKey, Transaction[]>();
+    for (const tx of transactions) {
+      if (!inRange(tx)) continue;
+      if (!map.has(tx.category)) map.set(tx.category, []);
+      map.get(tx.category)!.push(tx);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
+    return map;
+  }, [transactions, inRange]);
+
+  const highest = breakdown.rows[0];
+  const selected = selectedCategory
+    ? breakdown.rows.find((r) => r.meta.key === selectedCategory)
+    : undefined;
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Summary</Text>
+        <ViewModeToggle
+          mode={viewMode}
+          onChange={(m) => {
+            setViewMode(m);
+            setSelectedCategory(null);
+          }}
+        />
+        {viewMode === 'cycle' ? (
+          <TouchableOpacity style={styles.filterButton} onPress={() => setPickerVisible(true)}>
+            <Text style={styles.filterText}>{activeOption?.label ?? 'Select period'}</Text>
+            <Text style={styles.filterChevron}>▾</Text>
+          </TouchableOpacity>
+        ) : (
+          <CustomRangeBar
+            start={customStart}
+            end={customEnd}
+            onChange={(s, e) => {
+              setCustomStart(s);
+              setCustomEnd(e);
+              setSelectedCategory(null);
+            }}
+          />
+        )}
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        {highest ? (
+          <View style={styles.highlightCard}>
+            <Text style={styles.highlightLabel}>Highest Spend</Text>
+            <Text style={styles.highlightValue}>
+              {highest.meta.icon} {highest.meta.label} — {formatPeso(highest.amount)} (
+              {Math.round((highest.amount / breakdown.total) * 100)}%)
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.highlightCard}>
+            <Text style={styles.highlightLabel}>No spending logged yet</Text>
+          </View>
+        )}
+
+        <View style={styles.chartWrap}>
+          <DonutChart
+            slices={breakdown.rows.map((r) => ({
+              key: r.meta.key,
+              color: r.meta.color,
+              value: r.amount,
+            }))}
+            selectedKey={selectedCategory}
+            onSelectKey={(key) => setSelectedCategory(key as CategoryKey | null)}
+          />
+          <View style={styles.chartCenter} pointerEvents="none">
+            {selected ? (
+              <>
+                <Text style={styles.chartCenterIcon}>{selected.meta.icon}</Text>
+                <Text style={styles.chartCenterAmount}>{formatPeso(selected.amount)}</Text>
+                <Text style={styles.chartCenterSub}>
+                  {Math.round((selected.amount / breakdown.total) * 100)}% of total
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.chartCenterSub}>Total Outflow</Text>
+                <Text style={styles.chartCenterAmount}>{formatPeso(breakdown.total)}</Text>
+              </>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.list}>
+          {breakdown.rows.map((row) => {
+            const pct = breakdown.total > 0 ? (row.amount / breakdown.total) * 100 : 0;
+            const isSelected = selectedCategory === row.meta.key;
+            const entries = entriesByCategory.get(row.meta.key) ?? [];
+            return (
+              <TouchableOpacity
+                key={row.meta.key}
+                style={[styles.listRow, isSelected && styles.listRowSelected]}
+                onPress={() =>
+                  setSelectedCategory(isSelected ? null : (row.meta.key as CategoryKey))
+                }
+              >
+                <View style={styles.listRowTop}>
+                  <View style={styles.listRowLeft}>
+                    <Text style={styles.listIcon}>{row.meta.icon}</Text>
+                    <View>
+                      <Text style={styles.listLabel}>{row.meta.label}</Text>
+                      <Text style={styles.listCount}>
+                        {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.listRowRight}>
+                    <Text style={styles.listAmount}>{formatPeso(row.amount)}</Text>
+                    <Text style={styles.listChevron}>{isSelected ? '▾' : '▸'}</Text>
+                  </View>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${pct}%`, backgroundColor: row.meta.color },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.listPct}>{pct.toFixed(1)}%</Text>
+
+                {isSelected && (
+                  <View style={styles.entryList}>
+                    {entries.map((tx) => (
+                      <View key={tx.id} style={styles.entryRow}>
+                        <Text style={styles.entryTime}>
+                          {formatTimeOfDay(new Date(tx.timestamp))}
+                        </Text>
+                        <Text style={styles.entryNote} numberOfLines={1}>
+                          {tx.note ?? '—'}
+                        </Text>
+                        <Text style={styles.entryAmount}>{formatPeso(tx.amount)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+          {breakdown.rows.length === 0 && (
+            <Text style={styles.emptyText}>Nothing to show for this period yet.</Text>
+          )}
+        </View>
+      </ScrollView>
+
+      <CyclePickerModal
+        visible={pickerVisible}
+        options={cycleOptions}
+        selectedIdentifier={selectedCycle}
+        onSelect={(id) => {
+          setSelectedCycle(id);
+          setSelectedCategory(null);
+        }}
+        onClose={() => setPickerVisible(false)}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: theme.background },
+  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: theme.navy, marginBottom: 10 },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  filterText: { fontSize: 13, fontWeight: '600', color: theme.text, marginRight: 6 },
+  filterChevron: { fontSize: 12, color: theme.textMuted },
+  highlightCard: {
+    backgroundColor: theme.navy,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+  },
+  highlightLabel: { color: '#9FB2D6', fontSize: 12, fontWeight: '700', marginBottom: 4 },
+  highlightValue: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  chartWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  chartCenter: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartCenterIcon: { fontSize: 20 },
+  chartCenterAmount: { fontSize: 18, fontWeight: '800', color: theme.text, marginTop: 2 },
+  chartCenterSub: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
+  list: { gap: 10 },
+  listRow: {
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 14,
+    marginBottom: 10,
+  },
+  listRowSelected: { borderColor: theme.navy },
+  listRowTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  listRowLeft: { flexDirection: 'row', alignItems: 'center' },
+  listRowRight: { alignItems: 'flex-end' },
+  listIcon: { fontSize: 18, marginRight: 8 },
+  listLabel: { fontSize: 14.5, fontWeight: '700', color: theme.text },
+  listCount: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
+  listAmount: { fontSize: 14.5, fontWeight: '700', color: theme.text },
+  listChevron: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.background,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 3 },
+  listPct: { fontSize: 11, color: theme.textMuted, marginTop: 4, textAlign: 'right' },
+  entryList: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    gap: 6,
+  },
+  entryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  entryTime: { fontSize: 11, color: theme.textMuted, width: 70 },
+  entryNote: { fontSize: 12.5, color: theme.text, flex: 1, marginRight: 8 },
+  entryAmount: { fontSize: 12.5, fontWeight: '700', color: theme.text },
+  emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center', marginTop: 20 },
+});

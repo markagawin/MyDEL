@@ -1,0 +1,34 @@
+export type CategoryKey = string;
+
+export interface CustomCategory {
+  key: string;
+  label: string;
+  icon: string;
+  color: string;
+}
+
+export interface Transaction {
+  id: string;
+  amount: number;
+  category: CategoryKey;
+  note?: string;
+  timestamp: string; // ISO string
+  cycleIdentifier: string;
+}
+
+export type CycleMode = 'monthly' | 'semiA' | 'semiB' | 'custom' | 'customRange';
+
+export interface CycleSettings {
+  mode: CycleMode;
+  customDay: number; // day-of-month (1-28) derived from customAnchorDate; used when mode === 'custom'
+  customAnchorDate: string; // "yyyy-MM-dd" date the user picked; its day-of-month drives the recurring reset
+  customRangeStart: string; // "yyyy-MM-dd"; used when mode === 'customRange'
+  customRangeEnd: string; // "yyyy-MM-dd", inclusive; its length repeats indefinitely from customRangeStart
+}
+
+export interface CycleRange {
+  start: Date;
+  end: Date;
+  identifier: string;
+  label: string;
+}
