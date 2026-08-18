@@ -9,7 +9,13 @@ import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMas
 import CustomRangeBar from '../components/CustomRangeBar';
 import AddCategoryModal from '../components/AddCategoryModal';
 import ConfirmModal from '../components/ConfirmModal';
-import { AppTheme, useTheme } from '../theme';
+import { AppTheme, ThemePreference, useTheme, useThemePreference } from '../theme';
+
+const APPEARANCE_OPTIONS: { pref: ThemePreference; title: string }[] = [
+  { pref: 'system', title: 'System' },
+  { pref: 'light', title: 'Light' },
+  { pref: 'dark', title: 'Dark' },
+];
 
 const MODE_OPTIONS: { mode: CycleMode; title: string; description: string }[] = [
   {
@@ -68,6 +74,7 @@ function earlierOf(settings: { customRangeStart: string; customRangeEnd: string 
 export default function SettingsScreen() {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { preference, setPreference } = useThemePreference();
   const { settings, updateSettings, transactions, categories, addCategory, removeCategory } =
     useAppData();
   const [customDateText, setCustomDateText] = useState(() =>
@@ -113,7 +120,31 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-        <Text style={styles.title}>Payday Cycle</Text>
+        <Text style={styles.title}>Appearance</Text>
+        <Text style={styles.subtitle}>Choose how MyDEL looks, or follow your system setting.</Text>
+        <View style={styles.appearanceRow}>
+          {APPEARANCE_OPTIONS.map((opt) => {
+            const active = preference === opt.pref;
+            return (
+              <TouchableOpacity
+                key={opt.pref}
+                style={[styles.appearanceOption, active && styles.appearanceOptionActive]}
+                onPress={() => setPreference(opt.pref)}
+              >
+                <Text
+                  style={[
+                    styles.appearanceOptionText,
+                    active && styles.appearanceOptionTextActive,
+                  ]}
+                >
+                  {opt.title}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.title, styles.sectionSpacing]}>Payday Cycle</Text>
         <Text style={styles.subtitle}>
           Choose how MyDEL should calculate your active period and balance resets.
         </Text>
@@ -251,6 +282,22 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   title: { fontSize: 24, fontWeight: '800', color: theme.navy, marginBottom: 6 },
   subtitle: { fontSize: 13, color: theme.textMuted, marginBottom: 20 },
+  appearanceRow: {
+    flexDirection: 'row',
+    backgroundColor: theme.background,
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 24,
+  },
+  appearanceOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 9,
+    alignItems: 'center',
+  },
+  appearanceOptionActive: { backgroundColor: theme.navy },
+  appearanceOptionText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
+  appearanceOptionTextActive: { color: '#FFFFFF' },
   optionCard: {
     backgroundColor: theme.card,
     borderRadius: 14,

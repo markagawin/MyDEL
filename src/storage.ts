@@ -6,6 +6,7 @@ const SETTINGS_KEY = '@mydel/settings';
 const TRACKING_START_KEY = '@mydel/trackingStartDate';
 const PAYCHECKS_KEY = '@mydel/paychecks';
 const CUSTOM_CATEGORIES_KEY = '@mydel/customCategories';
+const THEME_PREFERENCE_KEY = '@mydel/themePreference';
 
 export const DEFAULT_SETTINGS: CycleSettings = {
   mode: 'monthly',
@@ -79,4 +80,13 @@ export async function loadCustomCategories(): Promise<CustomCategory[]> {
 
 export async function saveCustomCategories(categories: CustomCategory[]): Promise<void> {
   await AsyncStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(categories));
+}
+
+/** 'system' | 'light' | 'dark', or null if never set (defaults to 'system'). */
+export async function loadThemePreference(): Promise<string | null> {
+  return AsyncStorage.getItem(THEME_PREFERENCE_KEY);
+}
+
+export async function saveThemePreference(preference: string): Promise<void> {
+  await AsyncStorage.setItem(THEME_PREFERENCE_KEY, preference);
 }

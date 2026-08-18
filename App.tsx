@@ -10,14 +10,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Text, useColorScheme } from 'react-native';
+import { Text } from 'react-native';
 
 import { AppDataProvider } from './src/AppDataContext';
 import QuickLogScreen from './src/screens/QuickLogScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import SummaryScreen from './src/screens/SummaryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import { useTheme } from './src/theme';
+import { ThemeProvider, useIsDarkTheme, useTheme } from './src/theme';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -47,10 +47,9 @@ function Tabs() {
   );
 }
 
-export default function App() {
-  const scheme = useColorScheme();
+function AppInner() {
   const theme = useTheme();
-  const isDark = scheme === 'dark';
+  const isDark = useIsDarkTheme();
   const navigationTheme = {
     ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme),
     colors: {
@@ -64,21 +63,31 @@ export default function App() {
   };
 
   return (
+    <>
+      <NavigationContainer theme={navigationTheme}>
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Tabs" component={Tabs} />
+          <RootStack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ headerShown: true, title: 'Settings', presentation: 'modal' }}
+          />
+        </RootStack.Navigator>
+      </NavigationContainer>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+    </>
+  );
+}
+
+export default function App() {
+  return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AppDataProvider>
-          <NavigationContainer theme={navigationTheme}>
-            <RootStack.Navigator screenOptions={{ headerShown: false }}>
-              <RootStack.Screen name="Tabs" component={Tabs} />
-              <RootStack.Screen
-                name="Settings"
-                component={SettingsScreen}
-                options={{ headerShown: true, title: 'Settings', presentation: 'modal' }}
-              />
-            </RootStack.Navigator>
-          </NavigationContainer>
-          <StatusBar style="auto" />
-        </AppDataProvider>
+        <ThemeProvider>
+          <AppDataProvider>
+            <AppInner />
+          </AppDataProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
