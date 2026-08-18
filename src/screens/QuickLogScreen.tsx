@@ -18,6 +18,7 @@ import { formatPeso } from '../currency';
 import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
+import Toast from '../components/Toast';
 
 export default function QuickLogScreen() {
   const navigation = useNavigation<any>();
@@ -37,11 +38,19 @@ export default function QuickLogScreen() {
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [note, setNote] = useState('');
-  const [flash, setFlash] = useState<string | null>(null);
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
   const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
   const [amountBlurred, setAmountBlurred] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const amountInputRef = useRef<TextInput>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     amountInputRef.current?.focus();
@@ -66,14 +75,18 @@ export default function QuickLogScreen() {
 
   const handleLog = async () => {
     if (!canLog || category === null) return;
+    const loggedAmount = amountValue;
     await addTransaction({ amount: amountValue, category, note });
     setAmountText('');
     setNote('');
     setCategory(null);
     setAmountBlurred(false);
-    setFlash('Logged!');
-    setTimeout(() => setFlash(null), 1200);
     amountInputRef.current?.focus();
+
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(`${formatPeso(loggedAmount)} added successfully`);
+    setToastVisible(true);
+    toastTimeoutRef.current = setTimeout(() => setToastVisible(false), 2200);
   };
 
   return (
@@ -211,7 +224,7 @@ export default function QuickLogScreen() {
             disabled={!canLog}
             onPress={handleLog}
           >
-            <Text style={styles.logButtonText}>{flash ?? 'Log Entry'}</Text>
+            <Text style={styles.logButtonText}>Log Entry</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -229,6 +242,8 @@ export default function QuickLogScreen() {
         onSave={addCategory}
         onClose={() => setAddCategoryModalVisible(false)}
       />
+
+      <Toast visible={toastVisible} message={toastMessage} />
     </SafeAreaView>
   );
 }
