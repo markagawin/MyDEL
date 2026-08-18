@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -12,12 +12,15 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text } from 'react-native';
 
-import { AppDataProvider } from './src/AppDataContext';
+import { AppDataProvider, useAppData } from './src/AppDataContext';
 import QuickLogScreen from './src/screens/QuickLogScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import SummaryScreen from './src/screens/SummaryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import SplashScreen from './src/components/SplashScreen';
 import { ThemeProvider, useIsDarkTheme, useTheme } from './src/theme';
+
+const MIN_SPLASH_MS = 1200;
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -50,6 +53,14 @@ function Tabs() {
 function AppInner() {
   const theme = useTheme();
   const isDark = useIsDarkTheme();
+  const { loading } = useAppData();
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinTimeElapsed(true), MIN_SPLASH_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   const navigationTheme = {
     ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme),
     colors: {
@@ -61,6 +72,15 @@ function AppInner() {
       primary: theme.navy,
     },
   };
+
+  if (loading || !minTimeElapsed) {
+    return (
+      <>
+        <SplashScreen />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+      </>
+    );
+  }
 
   return (
     <>

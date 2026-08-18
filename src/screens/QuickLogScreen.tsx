@@ -52,10 +52,6 @@ export default function QuickLogScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    amountInputRef.current?.focus();
-  }, []);
-
   const cycleLabel = currentCycleRange.label;
 
   const periodTotal = useMemo(() => {
