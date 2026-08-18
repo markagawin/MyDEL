@@ -148,17 +148,12 @@ export default function QuickLogScreen() {
               value={amountText}
               onChangeText={(v) => setAmountText(v.replace(/[^0-9.]/g, ''))}
               editable={category !== null}
-              placeholder={category === null ? 'Pick a category first' : '0.00'}
+              placeholder="0.00"
               placeholderTextColor={theme.textMuted}
               keyboardType="decimal-pad"
               maxLength={10}
             />
           </View>
-          {category === null && (
-            <Text style={styles.categoryHint}>
-              👇 Select a category below to enter an amount
-            </Text>
-          )}
 
           <View style={styles.grid}>
             {categories.map((cat) => {
@@ -342,13 +337,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tileLabelSelected: { color: '#FFFFFF' },
-  categoryHint: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: theme.textMuted,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
   addTile: {
     borderStyle: 'dashed',
     backgroundColor: theme.background,
