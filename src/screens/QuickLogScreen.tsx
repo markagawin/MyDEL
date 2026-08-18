@@ -38,13 +38,12 @@ export default function QuickLogScreen() {
   const [flash, setFlash] = useState<string | null>(null);
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
   const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
+  const [amountBlurred, setAmountBlurred] = useState(false);
   const amountInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (category !== null) {
-      amountInputRef.current?.focus();
-    }
-  }, [category]);
+    amountInputRef.current?.focus();
+  }, []);
 
   const cycleLabel = currentCycleRange.label;
 
@@ -61,6 +60,7 @@ export default function QuickLogScreen() {
   const amountValue = parseFloat(amountText);
   const hasValidAmount = !Number.isNaN(amountValue) && amountValue > 0;
   const canLog = hasValidAmount && category !== null;
+  const showCategoryPrompt = amountBlurred && hasValidAmount && category === null;
 
   const handleLog = async () => {
     if (!canLog || category === null) return;
@@ -68,6 +68,7 @@ export default function QuickLogScreen() {
     setAmountText('');
     setNote('');
     setCategory(null);
+    setAmountBlurred(false);
     setFlash('Logged!');
     setTimeout(() => setFlash(null), 1200);
     amountInputRef.current?.focus();
@@ -140,20 +141,25 @@ export default function QuickLogScreen() {
           </View>
 
           <Text style={styles.fieldLabel}>AMOUNT</Text>
-          <View style={[styles.amountWrap, category === null && styles.amountWrapDisabled]}>
-            <Text style={[styles.pesoSign, category === null && styles.pesoSignDisabled]}>₱</Text>
+          <View style={styles.amountWrap}>
+            <Text style={styles.pesoSign}>₱</Text>
             <TextInput
               ref={amountInputRef}
               style={styles.amountInput}
               value={amountText}
               onChangeText={(v) => setAmountText(v.replace(/[^0-9.]/g, ''))}
-              editable={category !== null}
+              onFocus={() => setAmountBlurred(false)}
+              onBlur={() => setAmountBlurred(true)}
               placeholder="0.00"
               placeholderTextColor={theme.textMuted}
               keyboardType="decimal-pad"
               maxLength={10}
             />
           </View>
+
+          {showCategoryPrompt && (
+            <Text style={styles.categoryPrompt}>👇 Pick a category for this amount</Text>
+          )}
 
           <View style={styles.grid}>
             {categories.map((cat) => {
@@ -301,15 +307,20 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
     marginBottom: 8,
   },
-  amountWrapDisabled: { backgroundColor: theme.background },
   pesoSign: { fontSize: 36, fontWeight: '700', color: theme.navy, marginRight: 6 },
-  pesoSignDisabled: { color: theme.textMuted },
   amountInput: {
     fontSize: 44,
     fontWeight: '800',
     color: theme.text,
     minWidth: 140,
     textAlign: 'left',
+  },
+  categoryPrompt: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: theme.danger,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   grid: {
     flexDirection: 'row',
