@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -23,6 +23,8 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: Props) {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
@@ -46,7 +48,7 @@ export default function ConfirmModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15,44,89,0.35)',

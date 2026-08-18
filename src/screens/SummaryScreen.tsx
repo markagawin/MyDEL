@@ -5,7 +5,7 @@ import { useAppData } from '../AppDataContext';
 import { formatPeso } from '../currency';
 import { endOfDay, formatTimeOfDay, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 import DonutChart from '../components/DonutChart';
 import CyclePickerModal from '../components/CyclePickerModal';
 import CustomRangeBar from '../components/CustomRangeBar';
@@ -13,6 +13,8 @@ import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
 import { CategoryKey, Transaction } from '../types';
 
 export default function SummaryScreen() {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { transactions, currentCycleIdentifier, currentCycleRange, categories } = useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -222,7 +224,7 @@ export default function SummaryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: theme.navy, marginBottom: 10 },

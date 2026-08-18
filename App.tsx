@@ -1,19 +1,23 @@
 import 'react-native-gesture-handler';
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  DarkTheme as NavigationDarkTheme,
+  DefaultTheme as NavigationDefaultTheme,
+  NavigationContainer,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Text } from 'react-native';
+import { Text, useColorScheme } from 'react-native';
 
 import { AppDataProvider } from './src/AppDataContext';
 import QuickLogScreen from './src/screens/QuickLogScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import SummaryScreen from './src/screens/SummaryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import { theme } from './src/theme';
+import { useTheme } from './src/theme';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -25,12 +29,14 @@ const TAB_ICONS: Record<string, string> = {
 };
 
 function Tabs() {
+  const theme = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: theme.navy,
-        tabBarInactiveTintColor: '#9AA5B8',
+        tabBarInactiveTintColor: theme.textMuted,
+        tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border },
         tabBarIcon: () => <Text style={{ fontSize: 20 }}>{TAB_ICONS[route.name]}</Text>,
       })}
     >
@@ -42,11 +48,26 @@ function Tabs() {
 }
 
 export default function App() {
+  const scheme = useColorScheme();
+  const theme = useTheme();
+  const isDark = scheme === 'dark';
+  const navigationTheme = {
+    ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme),
+    colors: {
+      ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme).colors,
+      background: theme.background,
+      card: theme.card,
+      text: theme.text,
+      border: theme.border,
+      primary: theme.navy,
+    },
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AppDataProvider>
-          <NavigationContainer>
+          <NavigationContainer theme={navigationTheme}>
             <RootStack.Navigator screenOptions={{ headerShown: false }}>
               <RootStack.Screen name="Tabs" component={Tabs} />
               <RootStack.Screen

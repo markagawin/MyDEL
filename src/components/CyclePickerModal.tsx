@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CycleOption } from '../cycleList';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -18,6 +18,8 @@ export default function CyclePickerModal({
   onSelect,
   onClose,
 }: Props) {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -51,7 +53,7 @@ export default function CyclePickerModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15,44,89,0.35)',
@@ -79,7 +81,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: theme.success,
-    backgroundColor: '#E6F7F0',
+    backgroundColor: theme.background,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,

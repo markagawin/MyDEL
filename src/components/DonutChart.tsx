@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useTheme } from '../theme';
 
 export interface DonutSlice {
   key: string;
@@ -49,6 +50,7 @@ export default function DonutChart({
   selectedKey,
   onSelectKey,
 }: Props) {
+  const theme = useTheme();
   const total = slices.reduce((s, sl) => s + sl.value, 0);
   const cx = size / 2;
   const cy = size / 2;
@@ -62,7 +64,7 @@ export default function DonutChart({
         <Svg width={size} height={size}>
           <Path
             d={donutSlicePath(cx, cy, outerR, innerR, 0, Math.PI * 2 - 0.001)}
-            fill="#E3E7F0"
+            fill={theme.border}
           />
         </Svg>
       </View>

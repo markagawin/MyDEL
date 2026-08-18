@@ -9,7 +9,7 @@ import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMas
 import CustomRangeBar from '../components/CustomRangeBar';
 import AddCategoryModal from '../components/AddCategoryModal';
 import ConfirmModal from '../components/ConfirmModal';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 
 const MODE_OPTIONS: { mode: CycleMode; title: string; description: string }[] = [
   {
@@ -66,6 +66,8 @@ function earlierOf(settings: { customRangeStart: string; customRangeEnd: string 
 }
 
 export default function SettingsScreen() {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { settings, updateSettings, transactions, categories, addCategory, removeCategory } =
     useAppData();
   const [customDateText, setCustomDateText] = useState(() =>
@@ -245,7 +247,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   title: { fontSize: 24, fontWeight: '800', color: theme.navy, marginBottom: 6 },
   subtitle: { fontSize: 13, color: theme.textMuted, marginBottom: 20 },

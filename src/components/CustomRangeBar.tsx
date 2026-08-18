@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { formatFullDate, startOfDay } from '../cycleEngine';
 import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMask';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 
 interface Props {
   start: Date;
@@ -11,6 +11,8 @@ interface Props {
 }
 
 export default function CustomRangeBar({ start, end, onChange }: Props) {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [editing, setEditing] = useState<'start' | 'end' | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState(false);
@@ -82,7 +84,7 @@ export default function CustomRangeBar({ start, end, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   dateButton: {
     flex: 1,

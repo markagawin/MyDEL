@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { CATEGORY_COLOR_CHOICES, CATEGORY_ICON_CHOICES } from '../categories';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -22,6 +22,8 @@ interface Props {
 const SOFT_CAP = 12;
 
 export default function AddCategoryModal({ visible, categoryCount, onSave, onClose }: Props) {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [label, setLabel] = useState('');
   const [icon, setIcon] = useState(CATEGORY_ICON_CHOICES[0]);
   const [color, setColor] = useState(CATEGORY_COLOR_CHOICES[0]);
@@ -124,7 +126,7 @@ export default function AddCategoryModal({ visible, categoryCount, onSave, onClo
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15,44,89,0.35)',
@@ -141,7 +143,7 @@ const styles = StyleSheet.create({
   softCapWarning: {
     fontSize: 12,
     color: theme.danger,
-    backgroundColor: '#FCEBEB',
+    backgroundColor: theme.background,
     borderRadius: 10,
     padding: 10,
     marginBottom: 14,
@@ -214,6 +216,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 10,
   },
-  saveButtonDisabled: { backgroundColor: '#B7C2D6' },
+  saveButtonDisabled: { backgroundColor: theme.border },
   saveButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 });

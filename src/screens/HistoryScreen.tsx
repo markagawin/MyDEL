@@ -8,7 +8,7 @@ import { formatPeso } from '../currency';
 import { endOfDay, formatFullDate, formatTimeOfDay, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
 import { Transaction } from '../types';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 import CyclePickerModal from '../components/CyclePickerModal';
 import CustomRangeBar from '../components/CustomRangeBar';
 import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
@@ -20,6 +20,8 @@ function dayKey(iso: string): string {
 }
 
 export default function HistoryScreen() {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { transactions, currentCycleIdentifier, currentCycleRange, categoryMap, deleteTransaction } =
     useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
@@ -163,7 +165,7 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   header: {
     paddingHorizontal: 20,

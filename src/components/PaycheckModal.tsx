@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -10,6 +10,8 @@ interface Props {
 }
 
 export default function PaycheckModal({ visible, currentAmount, onSave, onClose }: Props) {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [text, setText] = useState('');
 
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function PaycheckModal({ visible, currentAmount, onSave, onClose 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15,44,89,0.35)',

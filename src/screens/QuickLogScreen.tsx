@@ -15,13 +15,15 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppData } from '../AppDataContext';
 import { CategoryKey } from '../types';
 import { formatPeso } from '../currency';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
 
 export default function QuickLogScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const {
     transactions,
     currentCycleIdentifier,
@@ -231,7 +233,7 @@ export default function QuickLogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   scrollContent: { padding: 20, paddingBottom: 24 },
   headerRow: {
@@ -357,7 +359,7 @@ const styles = StyleSheet.create({
   noteWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EAEEF6',
+    backgroundColor: theme.background,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 4,
@@ -388,6 +390,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  logButtonDisabled: { backgroundColor: '#B7C2D6' },
+  logButtonDisabled: { backgroundColor: theme.border },
   logButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
 });

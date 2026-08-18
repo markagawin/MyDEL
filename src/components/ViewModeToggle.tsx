@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { theme } from '../theme';
+import { AppTheme, useTheme } from '../theme';
 
 export type ViewMode = 'cycle' | 'custom';
 
@@ -10,6 +10,8 @@ interface Props {
 }
 
 export default function ViewModeToggle({ mode, onChange }: Props) {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={styles.wrap}>
       <TouchableOpacity
@@ -28,10 +30,10 @@ export default function ViewModeToggle({ mode, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    backgroundColor: '#EAEEF6',
+    backgroundColor: theme.background,
     borderRadius: 12,
     padding: 3,
     marginBottom: 12,
