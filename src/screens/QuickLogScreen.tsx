@@ -307,6 +307,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
     paddingVertical: 14,
+    paddingHorizontal: 20,
     marginBottom: 8,
   },
   pesoSign: { fontSize: 26, fontWeight: '700', color: theme.navy, marginRight: 6 },
