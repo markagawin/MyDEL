@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
@@ -12,6 +12,7 @@ import { theme } from '../theme';
 import CyclePickerModal from '../components/CyclePickerModal';
 import CustomRangeBar from '../components/CustomRangeBar';
 import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
+import ConfirmModal from '../components/ConfirmModal';
 
 function dayKey(iso: string): string {
   const d = new Date(iso);
@@ -33,17 +34,7 @@ export default function HistoryScreen() {
   );
 
   const activeOption = cycleOptions.find((o) => o.identifier === selectedCycle) ?? cycleOptions[0];
-
-  const confirmDelete = (item: Transaction) => {
-    Alert.alert(
-      'Delete entry?',
-      `${(categoryMap[item.category] ?? UNKNOWN_CATEGORY).label} — ${formatPeso(item.amount)}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteTransaction(item.id) },
-      ]
-    );
-  };
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
 
   const sections = useMemo(() => {
     const filtered =
@@ -134,7 +125,7 @@ export default function HistoryScreen() {
                   <TouchableOpacity
                     accessibilityLabel="Delete entry"
                     style={styles.rowDeleteButton}
-                    onPress={() => confirmDelete(item)}
+                    onPress={() => setPendingDelete(item)}
                   >
                     <Text style={styles.rowDeleteIcon}>🗑️</Text>
                   </TouchableOpacity>
@@ -151,6 +142,22 @@ export default function HistoryScreen() {
         selectedIdentifier={selectedCycle}
         onSelect={setSelectedCycle}
         onClose={() => setPickerVisible(false)}
+      />
+
+      <ConfirmModal
+        visible={pendingDelete !== null}
+        title="Delete entry?"
+        message={
+          pendingDelete
+            ? `${(categoryMap[pendingDelete.category] ?? UNKNOWN_CATEGORY).label} — ${formatPeso(pendingDelete.amount)}`
+            : undefined
+        }
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (pendingDelete) deleteTransaction(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
       />
     </SafeAreaView>
   );

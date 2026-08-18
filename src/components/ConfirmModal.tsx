@@ -1,0 +1,70 @@
+import React from 'react';
+import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { theme } from '../theme';
+
+interface Props {
+  visible: boolean;
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export default function ConfirmModal({
+  visible,
+  title,
+  message,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  destructive = true,
+  onConfirm,
+  onCancel,
+}: Props) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <Pressable style={styles.backdrop} onPress={onCancel}>
+        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+          <Text style={styles.title}>{title}</Text>
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+              <Text style={styles.cancelButtonText}>{cancelLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmButton, destructive && styles.confirmButtonDestructive]}
+              onPress={onConfirm}
+            >
+              <Text style={styles.confirmButtonText}>{confirmLabel}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15,44,89,0.35)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  sheet: { backgroundColor: theme.card, borderRadius: 16, padding: 20 },
+  title: { fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 8 },
+  message: { fontSize: 13.5, color: theme.textMuted, marginBottom: 18, lineHeight: 19 },
+  buttonRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  cancelButton: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10 },
+  cancelButtonText: { color: theme.textMuted, fontWeight: '700', fontSize: 14 },
+  confirmButton: {
+    backgroundColor: theme.navy,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  confirmButtonDestructive: { backgroundColor: theme.danger },
+  confirmButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+});

@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
-import { BUILT_IN_CATEGORY_KEYS } from '../categories';
+import { BUILT_IN_CATEGORY_KEYS, CategoryMeta } from '../categories';
 import { CycleMode } from '../types';
 import { formatFullDate, parseIsoDateOnly, toIsoDateOnly } from '../cycleEngine';
 import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMask';
 import CustomRangeBar from '../components/CustomRangeBar';
 import AddCategoryModal from '../components/AddCategoryModal';
+import ConfirmModal from '../components/ConfirmModal';
 import { theme } from '../theme';
 
 const MODE_OPTIONS: { mode: CycleMode; title: string; description: string }[] = [
@@ -72,6 +73,7 @@ export default function SettingsScreen() {
   );
   const [dateError, setDateError] = useState(false);
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<CategoryMeta | null>(null);
 
   const usageCountByCategory = useMemo(() => {
     const counts = new Map<string, number>();
@@ -81,17 +83,7 @@ export default function SettingsScreen() {
     return counts;
   }, [transactions]);
 
-  const handleRemoveCategory = (key: string, label: string) => {
-    const count = usageCountByCategory.get(key) ?? 0;
-    const message =
-      count > 0
-        ? `"${label}" has ${count} transaction${count === 1 ? '' : 's'} logged. They'll show as "Other" if you remove it.`
-        : `Remove "${label}"?`;
-    Alert.alert('Remove category?', message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeCategory(key) },
-    ]);
-  };
+  const pendingRemoveCount = pendingRemove ? usageCountByCategory.get(pendingRemove.key) ?? 0 : 0;
 
   const handleSelectMode = (mode: CycleMode) => {
     updateSettings({ ...settings, mode });
@@ -207,7 +199,7 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     accessibilityLabel={`Remove ${cat.label}`}
                     style={styles.categoryRemoveButton}
-                    onPress={() => handleRemoveCategory(cat.key, cat.label)}
+                    onPress={() => setPendingRemove(cat)}
                   >
                     <Text style={styles.categoryRemoveIcon}>🗑️</Text>
                   </TouchableOpacity>
@@ -230,6 +222,24 @@ export default function SettingsScreen() {
         categoryCount={categories.length}
         onSave={addCategory}
         onClose={() => setAddCategoryVisible(false)}
+      />
+
+      <ConfirmModal
+        visible={pendingRemove !== null}
+        title="Remove category?"
+        message={
+          pendingRemove
+            ? pendingRemoveCount > 0
+              ? `"${pendingRemove.label}" has ${pendingRemoveCount} transaction${pendingRemoveCount === 1 ? '' : 's'} logged. They'll show as "Other" if you remove it.`
+              : `Remove "${pendingRemove.label}"?`
+            : undefined
+        }
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (pendingRemove) removeCategory(pendingRemove.key);
+          setPendingRemove(null);
+        }}
+        onCancel={() => setPendingRemove(null)}
       />
     </SafeAreaView>
   );
