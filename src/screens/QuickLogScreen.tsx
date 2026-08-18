@@ -46,14 +46,6 @@ export default function QuickLogScreen() {
   const amountInputRef = useRef<TextInput>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On web, tapping a button/tile moves DOM focus to it before onPress fires, which
-  // dismisses the on-screen keyboard — and re-focusing the amount input afterwards doesn't
-  // reliably reopen it (WebKit ignores focus() calls that follow a same-gesture blur). Block
-  // the browser's default focus-shift on mousedown/touchstart so the amount input never
-  // loses focus in the first place.
-  const keepAmountFocused =
-    Platform.OS === 'web' ? { onMouseDown: (e: any) => e.preventDefault() } : {};
-
   useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -87,14 +79,11 @@ export default function QuickLogScreen() {
     const loggedCategory = category;
     const loggedNote = note;
 
-    // Reset and refocus synchronously within this tap's event handler — mobile browsers
-    // only reopen the soft keyboard for a focus() call made in the same gesture, not after
-    // an awaited async gap.
     setAmountText('');
     setNote('');
     setCategory(null);
     setAmountBlurred(false);
-    amountInputRef.current?.focus();
+    amountInputRef.current?.blur();
 
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(`${formatPeso(loggedAmount)} added successfully`);
@@ -202,7 +191,6 @@ export default function QuickLogScreen() {
                     styles.tile,
                     selected && { backgroundColor: cat.color, borderColor: cat.color },
                   ]}
-                  {...(keepAmountFocused as any)}
                 >
                   <Text style={styles.tileIcon}>{cat.icon}</Text>
                   <Text style={[styles.tileLabel, selected && styles.tileLabelSelected]}>
@@ -214,7 +202,6 @@ export default function QuickLogScreen() {
             <Pressable
               style={[styles.tile, styles.addTile]}
               onPress={() => setAddCategoryModalVisible(true)}
-              {...(keepAmountFocused as any)}
             >
               <Text style={styles.addTileIcon}>+</Text>
               <Text style={styles.addTileLabel}>Add</Text>
@@ -240,7 +227,6 @@ export default function QuickLogScreen() {
             style={[styles.logButton, !canLog && styles.logButtonDisabled]}
             disabled={!canLog}
             onPress={handleLog}
-            {...(keepAmountFocused as any)}
           >
             <Text style={styles.logButtonText}>Log Entry</Text>
           </TouchableOpacity>
