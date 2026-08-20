@@ -30,18 +30,29 @@ const SPLASH_FADE_MS = 500;
 // URL to pick an initial screen on load for a nested Stack > Tab structure — it silently
 // falls back to each navigator's default screen. This config makes deep links (manifest
 // shortcuts, a bookmarked tab) actually land on the right screen.
+//
+// `prefixes` is for scheme/host prefixes, not a bare path segment — it can't express GitHub
+// Pages' subpath hosting (/MyDEL/...). The path has to be baked into each screen's pattern
+// instead. Since the dev server serves the same source at the domain root (no /MyDEL/
+// segment), the prefix is derived at runtime from the current URL rather than hardcoded, so
+// both environments resolve correctly.
+const BASE_PATH =
+  typeof window !== 'undefined' && window.location.pathname.startsWith('/MyDEL')
+    ? 'MyDEL/'
+    : '';
+
 const linking: LinkingOptions<ReactNavigation.RootParamList> = {
   prefixes: [],
   config: {
     screens: {
       Tabs: {
         screens: {
-          QuickLog: 'Tabs/QuickLog',
-          History: 'Tabs/History',
-          Summary: 'Tabs/Summary',
+          QuickLog: `${BASE_PATH}Tabs/QuickLog`,
+          History: `${BASE_PATH}Tabs/History`,
+          Summary: `${BASE_PATH}Tabs/Summary`,
         },
       },
-      Settings: 'Settings',
+      Settings: `${BASE_PATH}Settings`,
     },
   },
 };
