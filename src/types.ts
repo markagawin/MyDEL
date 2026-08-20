@@ -14,6 +14,14 @@ export interface Transaction {
   note?: string;
   timestamp: string; // ISO string
   cycleIdentifier: string;
+  recurringSourceId?: string; // set when auto-logged from a RecurringEntry
+}
+
+export interface RecurringEntry {
+  id: string;
+  amount: number;
+  category: CategoryKey;
+  note?: string;
 }
 
 export type CycleMode = 'monthly' | 'semiA' | 'semiB' | 'custom' | 'customRange';
@@ -31,4 +39,15 @@ export interface CycleRange {
   end: Date;
   identifier: string;
   label: string;
+}
+
+export interface BackupData {
+  version: number;
+  exportedAt: string;
+  transactions: Transaction[];
+  settings: CycleSettings;
+  trackingStartDate: string | null;
+  paychecks: Record<string, number>;
+  customCategories: CustomCategory[];
+  recurringEntries: RecurringEntry[];
 }

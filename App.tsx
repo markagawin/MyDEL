@@ -18,6 +18,7 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import SummaryScreen from './src/screens/SummaryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import SplashScreen from './src/components/SplashScreen';
+import UpdateBanner from './src/components/UpdateBanner';
 import { ThemeProvider, useIsDarkTheme, useTheme } from './src/theme';
 
 const MIN_SPLASH_MS = 2000;
@@ -112,6 +113,7 @@ function AppInner() {
           <SplashScreen />
         </Animated.View>
       )}
+      {ready && <UpdateBanner />}
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </>
   );

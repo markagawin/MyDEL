@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CustomCategory, CycleSettings, Transaction } from './types';
+import { CustomCategory, CycleSettings, RecurringEntry, Transaction } from './types';
 
 const TRANSACTIONS_KEY = '@mydel/transactions';
 const SETTINGS_KEY = '@mydel/settings';
@@ -7,6 +7,7 @@ const TRACKING_START_KEY = '@mydel/trackingStartDate';
 const PAYCHECKS_KEY = '@mydel/paychecks';
 const CUSTOM_CATEGORIES_KEY = '@mydel/customCategories';
 const THEME_PREFERENCE_KEY = '@mydel/themePreference';
+const RECURRING_ENTRIES_KEY = '@mydel/recurringEntries';
 
 export const DEFAULT_SETTINGS: CycleSettings = {
   mode: 'monthly',
@@ -80,6 +81,20 @@ export async function loadCustomCategories(): Promise<CustomCategory[]> {
 
 export async function saveCustomCategories(categories: CustomCategory[]): Promise<void> {
   await AsyncStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(categories));
+}
+
+export async function loadRecurringEntries(): Promise<RecurringEntry[]> {
+  const raw = await AsyncStorage.getItem(RECURRING_ENTRIES_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as RecurringEntry[];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveRecurringEntries(entries: RecurringEntry[]): Promise<void> {
+  await AsyncStorage.setItem(RECURRING_ENTRIES_KEY, JSON.stringify(entries));
 }
 
 /** 'system' | 'light' | 'dark', or null if never set (defaults to 'system'). */

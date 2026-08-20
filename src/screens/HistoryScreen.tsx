@@ -13,6 +13,7 @@ import CyclePickerModal from '../components/CyclePickerModal';
 import CustomRangeBar from '../components/CustomRangeBar';
 import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
 import ConfirmModal from '../components/ConfirmModal';
+import EditTransactionModal from '../components/EditTransactionModal';
 
 function dayKey(iso: string): string {
   const d = new Date(iso);
@@ -22,13 +23,21 @@ function dayKey(iso: string): string {
 export default function HistoryScreen() {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { transactions, currentCycleIdentifier, currentCycleRange, categoryMap, deleteTransaction } =
-    useAppData();
+  const {
+    transactions,
+    currentCycleIdentifier,
+    currentCycleRange,
+    categories,
+    categoryMap,
+    deleteTransaction,
+    updateTransaction,
+  } = useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('cycle');
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const cycleOptions = useMemo(
     () => getAvailableCycles(transactions, currentCycleRange),
@@ -114,7 +123,11 @@ export default function HistoryScreen() {
                   </TouchableOpacity>
                 )}
               >
-                <View style={styles.row}>
+                <TouchableOpacity
+                  style={styles.row}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingTransaction(item)}
+                >
                   <View style={[styles.badge, { backgroundColor: meta.color }]}>
                     <Text style={styles.badgeIcon}>{meta.icon}</Text>
                   </View>
@@ -131,7 +144,7 @@ export default function HistoryScreen() {
                   >
                     <Text style={styles.rowDeleteIcon}>🗑️</Text>
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               </Swipeable>
             );
           }}
@@ -160,6 +173,13 @@ export default function HistoryScreen() {
           setPendingDelete(null);
         }}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <EditTransactionModal
+        transaction={editingTransaction}
+        categories={categories}
+        onSave={(id, input) => updateTransaction(id, input)}
+        onClose={() => setEditingTransaction(null)}
       />
     </SafeAreaView>
   );

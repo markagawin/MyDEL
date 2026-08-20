@@ -6,17 +6,27 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { CategoryKey, CustomCategory, CycleRange, CycleSettings, Transaction } from './types';
+import {
+  BackupData,
+  CategoryKey,
+  CustomCategory,
+  CycleRange,
+  CycleSettings,
+  RecurringEntry,
+  Transaction,
+} from './types';
 import { CATEGORIES, CATEGORY_MAP, CategoryMeta } from './categories';
 import {
   DEFAULT_SETTINGS,
   loadCustomCategories,
   loadPaychecks,
+  loadRecurringEntries,
   loadSettings,
   loadTrackingStartDate,
   loadTransactions,
   saveCustomCategories,
   savePaychecks,
+  saveRecurringEntries,
   saveSettings,
   saveTrackingStartDate,
   saveTransactions,
@@ -33,12 +43,21 @@ interface AppDataContextValue {
   currentPaycheck: number | null;
   categories: CategoryMeta[];
   categoryMap: Record<string, CategoryMeta>;
-  addTransaction: (input: { amount: number; category: CategoryKey; note?: string }) => Promise<void>;
+  recurringEntries: RecurringEntry[];
+  addTransaction: (input: { amount: number; category: CategoryKey; note?: string }) => string;
   deleteTransaction: (id: string) => Promise<void>;
+  updateTransaction: (
+    id: string,
+    input: { amount: number; category: CategoryKey; note?: string }
+  ) => Promise<void>;
   updateSettings: (settings: CycleSettings) => Promise<void>;
   setCurrentPaycheck: (amount: number | null) => Promise<void>;
   addCategory: (input: { label: string; icon: string; color: string }) => Promise<void>;
   removeCategory: (key: string) => Promise<void>;
+  addRecurringEntry: (input: { amount: number; category: CategoryKey; note?: string }) => Promise<void>;
+  removeRecurringEntry: (id: string) => Promise<void>;
+  exportBackup: () => BackupData;
+  restoreFromBackup: (data: BackupData) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextValue | undefined>(undefined);
@@ -59,20 +78,24 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [trackingStartDate, setTrackingStartDate] = useState<string | null>(null);
   const [paychecks, setPaychecks] = useState<Record<string, number>>({});
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [recurringEntries, setRecurringEntries] = useState<RecurringEntry[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [tx, s, trackingStart, storedPaychecks, storedCustomCategories] = await Promise.all([
-        loadTransactions(),
-        loadSettings(),
-        loadTrackingStartDate(),
-        loadPaychecks(),
-        loadCustomCategories(),
-      ]);
+      const [tx, s, trackingStart, storedPaychecks, storedCustomCategories, storedRecurring] =
+        await Promise.all([
+          loadTransactions(),
+          loadSettings(),
+          loadTrackingStartDate(),
+          loadPaychecks(),
+          loadCustomCategories(),
+          loadRecurringEntries(),
+        ]);
       setTransactions(tx);
       setSettings(s);
       setPaychecks(storedPaychecks);
       setCustomCategories(storedCustomCategories);
+      setRecurringEntries(storedRecurring);
       if (trackingStart) {
         setTrackingStartDate(trackingStart);
       } else {
@@ -105,7 +128,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [customCategories]);
 
   const addTransaction = useCallback<AppDataContextValue['addTransaction']>(
-    async ({ amount, category, note }) => {
+    ({ amount, category, note }) => {
       const now = new Date();
       const tx: Transaction = {
         id: generateId(),
@@ -120,6 +143,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         saveTransactions(next);
         return next;
       });
+      return tx.id;
     },
     [currentCycleRange]
   );
@@ -131,6 +155,59 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  const updateTransaction = useCallback(
+    async (id: string, input: { amount: number; category: CategoryKey; note?: string }) => {
+      setTransactions((prev) => {
+        const next = prev.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                amount: input.amount,
+                category: input.category,
+                note: input.note && input.note.trim().length > 0 ? input.note.trim() : undefined,
+              }
+            : t
+        );
+        saveTransactions(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  // Auto-log any recurring entry that hasn't already produced a transaction for the
+  // current cycle. Self-terminating: once applied, `transactions` includes the new
+  // entries so the next effect run finds nothing missing and no-ops.
+  useEffect(() => {
+    if (loading || recurringEntries.length === 0) return;
+
+    const existingSourceIds = new Set(
+      transactions
+        .filter((t) => t.cycleIdentifier === currentCycleRange.identifier && t.recurringSourceId)
+        .map((t) => t.recurringSourceId)
+    );
+
+    const missing = recurringEntries.filter((r) => !existingSourceIds.has(r.id));
+    if (missing.length === 0) return;
+
+    const now = new Date();
+    const newTxs: Transaction[] = missing.map((r) => ({
+      id: generateId(),
+      amount: r.amount,
+      category: r.category,
+      note: r.note,
+      timestamp: now.toISOString(),
+      cycleIdentifier: currentCycleRange.identifier,
+      recurringSourceId: r.id,
+    }));
+
+    setTransactions((prev) => {
+      const next = [...newTxs, ...prev];
+      saveTransactions(next);
+      return next;
+    });
+  }, [loading, recurringEntries, transactions, currentCycleRange.identifier]);
 
   const updateSettings = useCallback(async (next: CycleSettings) => {
     setSettings(next);
@@ -184,6 +261,69 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addRecurringEntry = useCallback(
+    async (input: { amount: number; category: CategoryKey; note?: string }) => {
+      const entry: RecurringEntry = {
+        id: generateId(),
+        amount: input.amount,
+        category: input.category,
+        note: input.note && input.note.trim().length > 0 ? input.note.trim() : undefined,
+      };
+      setRecurringEntries((prev) => {
+        const next = [...prev, entry];
+        saveRecurringEntries(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  const removeRecurringEntry = useCallback(async (id: string) => {
+    setRecurringEntries((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      saveRecurringEntries(next);
+      return next;
+    });
+  }, []);
+
+  const exportBackup = useCallback(
+    (): BackupData => ({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      transactions,
+      settings,
+      trackingStartDate,
+      paychecks,
+      customCategories,
+      recurringEntries,
+    }),
+    [transactions, settings, trackingStartDate, paychecks, customCategories, recurringEntries]
+  );
+
+  const restoreFromBackup = useCallback(async (data: BackupData) => {
+    const nextTransactions = data.transactions ?? [];
+    const nextSettings = { ...DEFAULT_SETTINGS, ...data.settings };
+    const nextPaychecks = data.paychecks ?? {};
+    const nextCustomCategories = data.customCategories ?? [];
+    const nextRecurringEntries = data.recurringEntries ?? [];
+
+    await Promise.all([
+      saveTransactions(nextTransactions),
+      saveSettings(nextSettings),
+      savePaychecks(nextPaychecks),
+      saveCustomCategories(nextCustomCategories),
+      saveRecurringEntries(nextRecurringEntries),
+      data.trackingStartDate ? saveTrackingStartDate(data.trackingStartDate) : Promise.resolve(),
+    ]);
+
+    setTransactions(nextTransactions);
+    setSettings(nextSettings);
+    setPaychecks(nextPaychecks);
+    setCustomCategories(nextCustomCategories);
+    setRecurringEntries(nextRecurringEntries);
+    if (data.trackingStartDate) setTrackingStartDate(data.trackingStartDate);
+  }, []);
+
   const value: AppDataContextValue = {
     loading,
     transactions,
@@ -193,12 +333,18 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     currentPaycheck: paychecks[currentCycleRange.identifier] ?? null,
     categories,
     categoryMap,
+    recurringEntries,
     addTransaction,
     deleteTransaction,
+    updateTransaction,
     updateSettings,
     setCurrentPaycheck,
     addCategory,
     removeCategory,
+    addRecurringEntry,
+    removeRecurringEntry,
+    exportBackup,
+    restoreFromBackup,
   };
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

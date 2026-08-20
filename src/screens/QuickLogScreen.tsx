@@ -32,6 +32,7 @@ export default function QuickLogScreen() {
     currentPaycheck,
     categories,
     addTransaction,
+    deleteTransaction,
     setCurrentPaycheck,
     addCategory,
   } = useAppData();
@@ -43,6 +44,7 @@ export default function QuickLogScreen() {
   const [amountBlurred, setAmountBlurred] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [toastUndoId, setToastUndoId] = useState<string | null>(null);
   const amountInputRef = useRef<TextInput>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -77,16 +79,26 @@ export default function QuickLogScreen() {
 
     setAmountText('');
     setNote('');
-    setCategory(null);
     setAmountBlurred(false);
     amountInputRef.current?.blur();
 
+    const newId = addTransaction({ amount: loggedAmount, category: loggedCategory, note: loggedNote });
+
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(`${formatPeso(loggedAmount)} added successfully`);
+    setToastUndoId(newId);
     setToastVisible(true);
-    toastTimeoutRef.current = setTimeout(() => setToastVisible(false), 2200);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastVisible(false);
+      setToastUndoId(null);
+    }, 2200);
+  };
 
-    addTransaction({ amount: loggedAmount, category: loggedCategory, note: loggedNote });
+  const handleUndo = () => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    if (toastUndoId) deleteTransaction(toastUndoId);
+    setToastVisible(false);
+    setToastUndoId(null);
   };
 
   return (
@@ -243,7 +255,7 @@ export default function QuickLogScreen() {
         onClose={() => setAddCategoryModalVisible(false)}
       />
 
-      <Toast visible={toastVisible} message={toastMessage} />
+      <Toast visible={toastVisible} message={toastMessage} onUndo={handleUndo} />
     </SafeAreaView>
   );
 }

@@ -1,25 +1,31 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { AppTheme, useTheme } from '../theme';
 
 interface Props {
   visible: boolean;
   message: string;
+  onUndo?: () => void;
 }
 
-export default function Toast({ visible, message }: Props) {
+export default function Toast({ visible, message, onUndo }: Props) {
   const theme = useTheme();
   const styles = useRef(createStyles(theme)).current;
   const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     Animated.parallel([
-      Animated.spring(translateY, {
+      Animated.timing(translateY, {
         toValue: visible ? 0 : -80,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-        speed: 14,
-        bounciness: 8,
       }),
       Animated.timing(opacity, {
         toValue: visible ? 1 : 0,
@@ -29,17 +35,19 @@ export default function Toast({ visible, message }: Props) {
     ]).start();
   }, [visible]);
 
-  if (!message) return null;
-
   return (
     <Animated.View
-      pointerEvents="none"
-      style={[styles.wrap, { transform: [{ translateY }], opacity }]}
+      style={[styles.wrap, { transform: [{ translateY }], opacity, pointerEvents: 'box-none' }]}
     >
       <Text style={styles.icon}>✓</Text>
       <Text style={styles.text} numberOfLines={2}>
         {message}
       </Text>
+      {visible && onUndo && (
+        <TouchableOpacity onPress={onUndo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={styles.undoText}>Undo</Text>
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 }
@@ -68,4 +76,11 @@ const createStyles = (theme: AppTheme) =>
     },
     icon: { fontSize: 16, fontWeight: '800', color: theme.success, marginRight: 8 },
     text: { fontSize: 13.5, fontWeight: '700', color: theme.success, flex: 1 },
+    undoText: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: theme.success,
+      textDecorationLine: 'underline',
+      marginLeft: 10,
+    },
   });

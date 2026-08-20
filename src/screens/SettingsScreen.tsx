@@ -1,13 +1,25 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
-import { BUILT_IN_CATEGORY_KEYS, CategoryMeta } from '../categories';
-import { CycleMode } from '../types';
+import { BUILT_IN_CATEGORY_KEYS, CategoryMeta, UNKNOWN_CATEGORY } from '../categories';
+import { CycleMode, RecurringEntry } from '../types';
 import { formatFullDate, parseIsoDateOnly, toIsoDateOnly } from '../cycleEngine';
+import { formatPeso } from '../currency';
 import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMask';
 import CustomRangeBar from '../components/CustomRangeBar';
 import AddCategoryModal from '../components/AddCategoryModal';
+import AddRecurringEntryModal from '../components/AddRecurringEntryModal';
+import ImportBackupModal from '../components/ImportBackupModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { AppTheme, ThemePreference, useTheme, useThemePreference } from '../theme';
 
@@ -75,14 +87,29 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { preference, setPreference } = useThemePreference();
-  const { settings, updateSettings, transactions, categories, addCategory, removeCategory } =
-    useAppData();
+  const {
+    settings,
+    updateSettings,
+    transactions,
+    categories,
+    categoryMap,
+    addCategory,
+    removeCategory,
+    recurringEntries,
+    addRecurringEntry,
+    removeRecurringEntry,
+    exportBackup,
+    restoreFromBackup,
+  } = useAppData();
   const [customDateText, setCustomDateText] = useState(() =>
     formatDateMask(digitsFromDate(parseIsoDateOnly(settings.customAnchorDate)))
   );
   const [dateError, setDateError] = useState(false);
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<CategoryMeta | null>(null);
+  const [addRecurringVisible, setAddRecurringVisible] = useState(false);
+  const [pendingRemoveRecurring, setPendingRemoveRecurring] = useState<RecurringEntry | null>(null);
+  const [importVisible, setImportVisible] = useState(false);
 
   const usageCountByCategory = useMemo(() => {
     const counts = new Map<string, number>();
@@ -96,6 +123,24 @@ export default function SettingsScreen() {
 
   const handleSelectMode = (mode: CycleMode) => {
     updateSettings({ ...settings, mode });
+  };
+
+  const handleExport = async () => {
+    const data = exportBackup();
+    const json = JSON.stringify(data, null, 2);
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mydel-backup-${data.exportedAt.slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } else {
+      await Share.share({ message: json, title: 'MyDEL Backup' });
+    }
   };
 
   const handleCustomDateChange = (value: string) => {
@@ -248,6 +293,65 @@ export default function SettingsScreen() {
         >
           <Text style={styles.addCategoryButtonText}>+ Add Category</Text>
         </TouchableOpacity>
+
+        <Text style={[styles.title, styles.sectionSpacing]}>Recurring Entries</Text>
+        <Text style={styles.subtitle}>
+          Automatically logged once every period — handy for rent, subscriptions, and other
+          fixed costs.
+        </Text>
+
+        {recurringEntries.length > 0 && (
+          <View style={styles.categoryList}>
+            {recurringEntries.map((entry) => {
+              const meta = categoryMap[entry.category] ?? UNKNOWN_CATEGORY;
+              return (
+                <View key={entry.id} style={styles.categoryRow}>
+                  <View style={[styles.categoryBadge, { backgroundColor: meta.color }]}>
+                    <Text style={styles.categoryBadgeIcon}>{meta.icon}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.categoryLabel}>
+                      {meta.label} — {formatPeso(entry.amount)}
+                    </Text>
+                    {entry.note ? <Text style={styles.recurringNote}>{entry.note}</Text> : null}
+                  </View>
+                  <TouchableOpacity
+                    accessibilityLabel="Remove recurring entry"
+                    style={styles.categoryRemoveButton}
+                    onPress={() => setPendingRemoveRecurring(entry)}
+                  >
+                    <Text style={styles.categoryRemoveIcon}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.addCategoryButton}
+          onPress={() => setAddRecurringVisible(true)}
+        >
+          <Text style={styles.addCategoryButtonText}>+ Add Recurring Entry</Text>
+        </TouchableOpacity>
+
+        <Text style={[styles.title, styles.sectionSpacing]}>Backup & Restore</Text>
+        <Text style={styles.subtitle}>
+          Export your data to a file you can keep safe, or restore from a previous backup.
+        </Text>
+        <View style={styles.backupRow}>
+          <TouchableOpacity style={styles.backupButton} onPress={handleExport}>
+            <Text style={styles.backupButtonText}>Export Data</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.backupButton, styles.backupButtonSecondary]}
+            onPress={() => setImportVisible(true)}
+          >
+            <Text style={[styles.backupButtonText, styles.backupButtonSecondaryText]}>
+              Import Data
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <AddCategoryModal
@@ -273,6 +377,35 @@ export default function SettingsScreen() {
           setPendingRemove(null);
         }}
         onCancel={() => setPendingRemove(null)}
+      />
+
+      <AddRecurringEntryModal
+        visible={addRecurringVisible}
+        categories={categories}
+        onSave={addRecurringEntry}
+        onClose={() => setAddRecurringVisible(false)}
+      />
+
+      <ConfirmModal
+        visible={pendingRemoveRecurring !== null}
+        title="Remove recurring entry?"
+        message={
+          pendingRemoveRecurring
+            ? `${(categoryMap[pendingRemoveRecurring.category] ?? UNKNOWN_CATEGORY).label} — ${formatPeso(pendingRemoveRecurring.amount)}`
+            : undefined
+        }
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (pendingRemoveRecurring) removeRecurringEntry(pendingRemoveRecurring.id);
+          setPendingRemoveRecurring(null);
+        }}
+        onCancel={() => setPendingRemoveRecurring(null)}
+      />
+
+      <ImportBackupModal
+        visible={importVisible}
+        onImport={restoreFromBackup}
+        onClose={() => setImportVisible(false)}
       />
     </SafeAreaView>
   );
@@ -389,4 +522,20 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
   },
   addCategoryButtonText: { color: theme.navy, fontWeight: '700', fontSize: 14 },
+  recurringNote: { fontSize: 12, color: theme.textMuted, marginTop: 1 },
+  backupRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  backupButton: {
+    flex: 1,
+    backgroundColor: theme.navy,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  backupButtonSecondary: {
+    backgroundColor: theme.card,
+    borderWidth: 1.5,
+    borderColor: theme.navy,
+  },
+  backupButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  backupButtonSecondaryText: { color: theme.navy },
 });
