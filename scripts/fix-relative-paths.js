@@ -13,6 +13,11 @@ const indexPath = path.join(distDir, 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 html = html.replace('href="/favicon.ico"', 'href="favicon.ico"');
 html = html.replace(/src="\/(_expo\/[^"]+)"/, 'src="$1"');
+// The 404.html deep-link redirect restores the visible URL to e.g. /MyDEL/Tabs/History via
+// history.replaceState before the deferred bundle <script> tag is parsed. Without an explicit
+// <base>, the browser resolves that tag's relative src against the now-changed path
+// (/MyDEL/Tabs/) instead of /MyDEL/, 404ing the bundle. An explicit base pins it regardless.
+html = html.replace('<head>', '<head>\n    <base href="/MyDEL/" />');
 fs.writeFileSync(indexPath, html);
 
 const jsDir = path.join(distDir, '_expo', 'static', 'js', 'web');
