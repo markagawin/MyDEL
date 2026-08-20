@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationDefaultTheme,
+  LinkingOptions,
   NavigationContainer,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -23,6 +24,27 @@ import { ThemeProvider, useIsDarkTheme, useTheme } from './src/theme';
 
 const MIN_SPLASH_MS = 2000;
 const SPLASH_FADE_MS = 500;
+
+// Without an explicit linking config, React Navigation's web integration keeps the URL in
+// sync when navigating inside the app (hence tab bar hrefs working), but does NOT read the
+// URL to pick an initial screen on load for a nested Stack > Tab structure — it silently
+// falls back to each navigator's default screen. This config makes deep links (manifest
+// shortcuts, a bookmarked tab) actually land on the right screen.
+const linking: LinkingOptions<ReactNavigation.RootParamList> = {
+  prefixes: [],
+  config: {
+    screens: {
+      Tabs: {
+        screens: {
+          QuickLog: 'Tabs/QuickLog',
+          History: 'Tabs/History',
+          Summary: 'Tabs/Summary',
+        },
+      },
+      Settings: 'Settings',
+    },
+  },
+};
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -94,7 +116,7 @@ function AppInner() {
   return (
     <>
       {ready && (
-        <NavigationContainer theme={navigationTheme}>
+        <NavigationContainer theme={navigationTheme} linking={linking}>
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <RootStack.Screen name="Tabs" component={Tabs} />
             <RootStack.Screen
