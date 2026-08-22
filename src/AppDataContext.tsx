@@ -39,6 +39,7 @@ import {
   clipRangeToTrackingStart,
   getCurrentCycleRange,
   getCycleRangeForDate,
+  parseCycleIdentifier,
   parseIsoDateOnly,
   toIsoDateOnly,
 } from './cycleEngine';
@@ -246,10 +247,44 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     });
   }, [loading, recurringEntries, transactions, currentCycleRange.identifier]);
 
-  const updateSettings = useCallback(async (next: CycleSettings) => {
-    setSettings(next);
-    await saveSettings(next);
-  }, []);
+  const updateSettings = useCallback(
+    async (next: CycleSettings) => {
+      setSettings(next);
+      await saveSettings(next);
+
+      // Re-bucket existing data into the newly defined periods so a mode/date
+      // change doesn't orphan transactions and paychecks under stale identifiers
+      // computed from the old settings.
+      setTransactions((prev) => {
+        const updated = prev.map((t) => {
+          const range = clipRangeToTrackingStart(
+            getCycleRangeForDate(new Date(t.timestamp), next),
+            trackingStartAsDate
+          );
+          return t.cycleIdentifier === range.identifier
+            ? t
+            : { ...t, cycleIdentifier: range.identifier };
+        });
+        saveTransactions(updated);
+        return updated;
+      });
+
+      setPaychecks((prev) => {
+        const updated: Record<string, number> = {};
+        for (const [identifier, amount] of Object.entries(prev)) {
+          const oldRange = parseCycleIdentifier(identifier);
+          const newRange = clipRangeToTrackingStart(
+            getCycleRangeForDate(oldRange.start, next),
+            trackingStartAsDate
+          );
+          updated[newRange.identifier] = amount;
+        }
+        savePaychecks(updated);
+        return updated;
+      });
+    },
+    [trackingStartAsDate]
+  );
 
   const setCurrentPaycheck = useCallback(
     async (amount: number | null) => {

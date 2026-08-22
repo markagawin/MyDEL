@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,6 +38,19 @@ export default function HistoryScreen() {
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  // If the user hasn't manually browsed to a past period, keep following "current"
+  // as its identifier shifts (e.g. after a payday cycle settings change).
+  const lastKnownCurrentRef = useRef(currentCycleIdentifier);
+  useEffect(() => {
+    if (
+      selectedCycle === lastKnownCurrentRef.current &&
+      currentCycleIdentifier !== lastKnownCurrentRef.current
+    ) {
+      setSelectedCycle(currentCycleIdentifier);
+    }
+    lastKnownCurrentRef.current = currentCycleIdentifier;
+  }, [currentCycleIdentifier, selectedCycle]);
 
   const cycleOptions = useMemo(
     () => getAvailableCycles(transactions, currentCycleRange),
