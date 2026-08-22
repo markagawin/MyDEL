@@ -35,7 +35,13 @@ import {
   saveTrackingStartDate,
   saveTransactions,
 } from './storage';
-import { getCurrentCycleRange, parseIsoDateOnly, toIsoDateOnly } from './cycleEngine';
+import {
+  clipRangeToTrackingStart,
+  getCurrentCycleRange,
+  getCycleRangeForDate,
+  parseIsoDateOnly,
+  toIsoDateOnly,
+} from './cycleEngine';
 import { generateId } from './uuid';
 
 interface AppDataContextValue {
@@ -52,7 +58,12 @@ interface AppDataContextValue {
   profilePhotoUri: string | null;
   setProfileName: (name: string) => Promise<void>;
   setProfilePhotoUri: (uri: string | null) => Promise<void>;
-  addTransaction: (input: { amount: number; category: CategoryKey; note?: string }) => string;
+  addTransaction: (input: {
+    amount: number;
+    category: CategoryKey;
+    note?: string;
+    timestamp?: Date;
+  }) => string;
   deleteTransaction: (id: string) => Promise<void>;
   updateTransaction: (
     id: string,
@@ -150,15 +161,19 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [customCategories]);
 
   const addTransaction = useCallback<AppDataContextValue['addTransaction']>(
-    ({ amount, category, note }) => {
-      const now = new Date();
+    ({ amount, category, note, timestamp }) => {
+      const when = timestamp ?? new Date();
+      const cycleIdentifier = timestamp
+        ? clipRangeToTrackingStart(getCycleRangeForDate(when, settings), trackingStartAsDate)
+            .identifier
+        : currentCycleRange.identifier;
       const tx: Transaction = {
         id: generateId(),
         amount,
         category,
         note: note && note.trim().length > 0 ? note.trim() : undefined,
-        timestamp: now.toISOString(),
-        cycleIdentifier: currentCycleRange.identifier,
+        timestamp: when.toISOString(),
+        cycleIdentifier,
       };
       setTransactions((prev) => {
         const next = [tx, ...prev];
@@ -167,7 +182,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       });
       return tx.id;
     },
-    [currentCycleRange]
+    [currentCycleRange, settings, trackingStartAsDate]
   );
 
   const deleteTransaction = useCallback(async (id: string) => {

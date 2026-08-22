@@ -16,9 +16,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppData } from '../AppDataContext';
 import { CategoryKey } from '../types';
 import { formatPeso } from '../currency';
+import { formatFullDate, sameDay } from '../cycleEngine';
 import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
+import DatePickerModal from '../components/DatePickerModal';
 import Toast from '../components/Toast';
 import { noWebOutline } from '../webInputStyle';
 
@@ -43,8 +45,10 @@ export default function QuickLogScreen() {
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [note, setNote] = useState('');
+  const [entryDate, setEntryDate] = useState(() => new Date());
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
   const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [amountBlurred, setAmountBlurred] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -81,12 +85,29 @@ export default function QuickLogScreen() {
     const loggedCategory = category;
     const loggedNote = note;
 
+    const now = new Date();
+    const timestamp = new Date(
+      entryDate.getFullYear(),
+      entryDate.getMonth(),
+      entryDate.getDate(),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    );
+
     setAmountText('');
     setNote('');
     setAmountBlurred(false);
+    setEntryDate(new Date());
     amountInputRef.current?.blur();
 
-    const newId = addTransaction({ amount: loggedAmount, category: loggedCategory, note: loggedNote });
+    const newId = addTransaction({
+      amount: loggedAmount,
+      category: loggedCategory,
+      note: loggedNote,
+      timestamp,
+    });
 
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(`${formatPeso(loggedAmount)} added successfully`);
@@ -248,6 +269,15 @@ export default function QuickLogScreen() {
             />
           </View>
 
+          <Text style={styles.fieldLabelMuted}>DATE</Text>
+          <TouchableOpacity style={styles.dateWrap} onPress={() => setDatePickerVisible(true)}>
+            <Text style={styles.dateIcon}>📅</Text>
+            <Text style={styles.dateText}>
+              {formatFullDate(entryDate)}
+              {sameDay(entryDate, new Date()) ? ' (Today)' : ''}
+            </Text>
+          </TouchableOpacity>
+
         </ScrollView>
 
         <View style={[styles.floatingFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
@@ -273,6 +303,14 @@ export default function QuickLogScreen() {
         categoryCount={categories.length}
         onSave={addCategory}
         onClose={() => setAddCategoryModalVisible(false)}
+      />
+
+      <DatePickerModal
+        visible={datePickerVisible}
+        value={entryDate}
+        maxDate={new Date()}
+        onChange={setEntryDate}
+        onClose={() => setDatePickerVisible(false)}
       />
 
       <Toast visible={toastVisible} message={toastMessage} onUndo={handleUndo} />
@@ -435,6 +473,17 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 14,
     color: theme.text,
   },
+  dateWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.surfaceMuted,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  dateIcon: { fontSize: 15, marginRight: 8 },
+  dateText: { fontSize: 14, fontWeight: '600', color: theme.text },
   floatingFooter: {
     paddingHorizontal: 20,
     paddingTop: 12,
