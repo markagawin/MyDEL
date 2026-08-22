@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Transaction } from '../types';
 import { CategoryMeta, UNKNOWN_CATEGORY } from '../categories';
 import { formatPeso, formatPesoCompact } from '../currency';
-import { formatFullDate, formatTimeOfDay, toIsoDateOnly } from '../cycleEngine';
+import { formatFullDate, formatTimeOfDay, sameDay, toIsoDateOnly } from '../cycleEngine';
 import { AppTheme, useTheme } from '../theme';
 
 interface Props {
@@ -12,10 +12,6 @@ interface Props {
   transactions: Transaction[];
   categoryMap: Record<string, CategoryMeta>;
   onClose: () => void;
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

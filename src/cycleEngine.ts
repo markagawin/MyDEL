@@ -21,6 +21,10 @@ export function endOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 }
 
+export function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 function isoDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -107,6 +111,40 @@ export function getCycleRangeForDate(date: Date, settings: CycleSettings): Cycle
       } else {
         start = makeDate(y, m - 1, anchor);
         end = makeDate(y, m, anchor - 1);
+      }
+      break;
+    }
+    case 'customDates': {
+      const known = [...(settings.customDates ?? [])]
+        .map(parseIsoDateOnly)
+        .sort((a, b) => a.getTime() - b.getTime());
+      if (known.length === 0) {
+        start = makeDate(y, m, 1);
+        end = makeDate(y, m, daysInMonth(y, m));
+        break;
+      }
+      const target = startOfDay(date);
+      let idx = -1;
+      for (let i = 0; i < known.length; i++) {
+        if (known[i].getTime() <= target.getTime()) idx = i;
+        else break;
+      }
+      if (idx === -1) {
+        // Before the earliest recorded payout date: approximate a period of the
+        // same length as the first known gap so there's still a bounded cycle.
+        const fallbackLen = known.length >= 2 ? daysBetween(known[0], known[1]) : 15;
+        end = addDays(known[0], -1);
+        start = addDays(known[0], -fallbackLen);
+      } else {
+        start = known[idx];
+        if (idx + 1 < known.length) {
+          end = addDays(known[idx + 1], -1);
+        } else {
+          // Past the last recorded payout date: extrapolate using the previous
+          // gap length until the user adds the next real payout date.
+          const fallbackLen = idx >= 1 ? daysBetween(known[idx - 1], known[idx]) : 15;
+          end = addDays(start, fallbackLen - 1);
+        }
       }
       break;
     }
