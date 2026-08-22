@@ -58,7 +58,7 @@ export default function CustomRangeBar({ start, end, onChange }: Props) {
       {editing && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setEditing(null)}>
           <Pressable style={styles.backdrop} onPress={() => setEditing(null)}>
-            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+            <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
               <Text style={styles.sheetTitle}>{editing === 'start' ? 'From date' : 'To date'}</Text>
               <Text style={styles.sheetHint}>Enter as MM/DD/YYYY</Text>
               <TextInput
@@ -76,7 +76,7 @@ export default function CustomRangeBar({ start, end, onChange }: Props) {
               <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
                 <Text style={styles.doneButtonText}>Done</Text>
               </TouchableOpacity>
-            </View>
+            </Pressable>
           </Pressable>
         </Modal>
       )}

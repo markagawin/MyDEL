@@ -36,7 +36,7 @@ export default function PaycheckModal({ visible, currentAmount, onSave, onClose 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <Text style={styles.title}>Paycheck for this period</Text>
           <Text style={styles.subtitle}>
             Enter the amount you received so MyDEL can show what's left as you spend.
@@ -63,7 +63,7 @@ export default function PaycheckModal({ visible, currentAmount, onSave, onClose 
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );

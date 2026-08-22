@@ -47,7 +47,7 @@ export default function AddRecurringEntryModal({ visible, categories, onSave, on
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={styles.title}>New Recurring Entry</Text>
             <Text style={styles.hint}>
@@ -116,7 +116,7 @@ export default function AddRecurringEntryModal({ visible, categories, onSave, on
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );

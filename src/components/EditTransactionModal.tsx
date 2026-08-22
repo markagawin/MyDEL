@@ -47,7 +47,7 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
   return (
     <Modal visible={transaction !== null} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={styles.title}>Edit Entry</Text>
 
@@ -112,7 +112,7 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );

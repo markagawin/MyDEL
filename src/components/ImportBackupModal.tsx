@@ -73,7 +73,7 @@ export default function ImportBackupModal({ visible, onImport, onClose }: Props)
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <Text style={styles.title}>Restore Backup</Text>
           <Text style={styles.hint}>
             Paste the contents of a MyDEL backup file below
@@ -115,7 +115,7 @@ export default function ImportBackupModal({ visible, onImport, onClose }: Props)
               <Text style={styles.restoreButtonText}>{importing ? 'Restoring…' : 'Restore'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );

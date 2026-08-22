@@ -23,7 +23,7 @@ export default function CyclePickerModal({
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <Text style={styles.title}>Select Period</Text>
           <FlatList
             data={options}
@@ -47,7 +47,7 @@ export default function CyclePickerModal({
               );
             }}
           />
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );

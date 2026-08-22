@@ -28,7 +28,7 @@ export default function ConfirmModal({
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <Text style={styles.title}>{title}</Text>
           {message ? <Text style={styles.message}>{message}</Text> : null}
           <View style={styles.buttonRow}>
@@ -42,7 +42,7 @@ export default function ConfirmModal({
               <Text style={styles.confirmButtonText}>{confirmLabel}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );

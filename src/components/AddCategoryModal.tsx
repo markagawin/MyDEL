@@ -47,7 +47,7 @@ export default function AddCategoryModal({ visible, categoryCount, onSave, onClo
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={styles.title}>New Category</Text>
 
@@ -120,7 +120,7 @@ export default function AddCategoryModal({ visible, categoryCount, onSave, onClo
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );
