@@ -1,15 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Transaction } from '../types';
+import { CategoryMeta, UNKNOWN_CATEGORY } from '../categories';
 import { formatPeso, formatPesoCompact } from '../currency';
-import { toIsoDateOnly } from '../cycleEngine';
+import { formatFullDate, formatTimeOfDay, toIsoDateOnly } from '../cycleEngine';
 import { AppTheme, useTheme } from '../theme';
 
 interface Props {
   visible: boolean;
   transactions: Transaction[];
+  categoryMap: Record<string, CategoryMeta>;
   onClose: () => void;
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -24,11 +30,12 @@ function startOfWeekMonday(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
 }
 
-export default function CalendarSummaryModal({ visible, transactions, onClose }: Props) {
+export default function CalendarSummaryModal({ visible, transactions, categoryMap, onClose }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const today = useMemo(() => new Date(), [visible]);
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const totalsByDay = useMemo(() => {
     const map = new Map<string, number>();
@@ -56,14 +63,27 @@ export default function CalendarSummaryModal({ visible, transactions, onClose }:
     return sum;
   }, [gridDays, totalsByDay, cursor]);
 
-  const goToPrevMonth = () => setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1));
-  const goToNextMonth = () => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1));
-  const goToToday = () => setCursor(new Date(today.getFullYear(), today.getMonth(), 1));
+  const goToPrevMonth = () => {
+    setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1));
+    setSelectedDate(null);
+  };
+  const goToNextMonth = () => {
+    setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1));
+    setSelectedDate(null);
+  };
+  const goToToday = () => {
+    setCursor(new Date(today.getFullYear(), today.getMonth(), 1));
+    setSelectedDate(null);
+  };
 
-  const isToday = (d: Date) =>
-    d.getFullYear() === today.getFullYear() &&
-    d.getMonth() === today.getMonth() &&
-    d.getDate() === today.getDate();
+  const isToday = (d: Date) => sameDay(d, today);
+
+  const selectedDayTransactions = useMemo(() => {
+    if (!selectedDate) return [];
+    return transactions
+      .filter((t) => sameDay(new Date(t.timestamp), selectedDate))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [transactions, selectedDate]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -90,7 +110,7 @@ export default function CalendarSummaryModal({ visible, transactions, onClose }:
           </TouchableOpacity>
         </View>
 
-        <View style={styles.body}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
           <View style={styles.weekdayRow}>
             {WEEKDAY_LABELS.map((w) => (
               <Text key={w} style={styles.weekdayLabel}>
@@ -104,10 +124,18 @@ export default function CalendarSummaryModal({ visible, transactions, onClose }:
               const inMonth = d.getMonth() === cursor.getMonth();
               const amount = totalsByDay.get(toIsoDateOnly(d)) ?? 0;
               const todayCell = isToday(d);
+              const selectedCell = selectedDate !== null && sameDay(d, selectedDate);
               return (
-                <View
+                <Pressable
                   key={d.getTime()}
-                  style={[styles.cell, !inMonth && styles.cellOutside, todayCell && styles.cellToday]}
+                  disabled={!inMonth}
+                  onPress={() => setSelectedDate((prev) => (prev && sameDay(prev, d) ? null : d))}
+                  style={[
+                    styles.cell,
+                    !inMonth && styles.cellOutside,
+                    todayCell && styles.cellToday,
+                    selectedCell && styles.cellSelected,
+                  ]}
                 >
                   <Text
                     style={[
@@ -126,10 +154,52 @@ export default function CalendarSummaryModal({ visible, transactions, onClose }:
                       {formatPesoCompact(amount)}
                     </Text>
                   )}
-                </View>
+                </Pressable>
               );
             })}
           </View>
+
+          {selectedDate && (
+            <View style={styles.dayDetailCard}>
+              <View style={styles.dayDetailHeader}>
+                <Text style={styles.dayDetailTitle}>{formatFullDate(selectedDate)}</Text>
+                <TouchableOpacity
+                  accessibilityLabel="Close day breakdown"
+                  onPress={() => setSelectedDate(null)}
+                  style={styles.dayDetailCloseButton}
+                >
+                  <Text style={styles.dayDetailCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {selectedDayTransactions.length === 0 ? (
+                <Text style={styles.dayDetailEmpty}>No spending logged on this day.</Text>
+              ) : (
+                selectedDayTransactions.map((tx) => {
+                  const meta = categoryMap[tx.category] ?? UNKNOWN_CATEGORY;
+                  return (
+                    <View key={tx.id} style={styles.dayDetailRow}>
+                      <View style={[styles.dayDetailBadge, { backgroundColor: meta.color }]}>
+                        <Text style={styles.dayDetailBadgeIcon}>{meta.icon}</Text>
+                      </View>
+                      <View style={styles.dayDetailMiddle}>
+                        <Text style={styles.dayDetailCategory}>{meta.label}</Text>
+                        {tx.note ? (
+                          <Text style={styles.dayDetailNote} numberOfLines={1}>
+                            {tx.note}
+                          </Text>
+                        ) : null}
+                        <Text style={styles.dayDetailTime}>
+                          {formatTimeOfDay(new Date(tx.timestamp))}
+                        </Text>
+                      </View>
+                      <Text style={styles.dayDetailAmount}>{formatPeso(tx.amount)}</Text>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
 
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>
@@ -137,7 +207,7 @@ export default function CalendarSummaryModal({ visible, transactions, onClose }:
             </Text>
             <Text style={styles.summaryValue}>{formatPeso(monthTotal)}</Text>
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -189,7 +259,8 @@ const createStyles = (theme: AppTheme) =>
     },
     navButtonText: { fontSize: 18, fontWeight: '700', color: theme.navy },
     monthLabel: { fontSize: 16, fontWeight: '800', color: theme.text, minWidth: 160, textAlign: 'center' },
-    body: { flex: 1, paddingHorizontal: 16, paddingBottom: 20 },
+    body: { flex: 1 },
+    bodyContent: { paddingHorizontal: 16, paddingBottom: 20 },
     weekdayRow: { flexDirection: 'row', marginBottom: 6 },
     weekdayLabel: {
       flex: 1,
@@ -210,11 +281,51 @@ const createStyles = (theme: AppTheme) =>
     },
     cellOutside: { opacity: 0.4 },
     cellToday: { backgroundColor: theme.navy },
+    cellSelected: { borderWidth: 2, borderColor: theme.navy },
     cellDay: { fontSize: 13.5, fontWeight: '700', color: theme.text },
     cellDayOutside: { color: theme.textMuted },
     cellDayToday: { color: '#FFFFFF' },
     cellAmount: { fontSize: 9.5, fontWeight: '700', color: theme.danger, marginTop: 2 },
     cellAmountToday: { color: '#FFFFFF' },
+    dayDetailCard: {
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: 16,
+      marginTop: 16,
+    },
+    dayDetailHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    dayDetailTitle: { fontSize: 14.5, fontWeight: '800', color: theme.navy },
+    dayDetailCloseButton: { padding: 4 },
+    dayDetailCloseText: { fontSize: 14, color: theme.textMuted, fontWeight: '700' },
+    dayDetailEmpty: { fontSize: 13, color: theme.textMuted },
+    dayDetailRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    dayDetailBadge: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10,
+    },
+    dayDetailBadgeIcon: { fontSize: 16 },
+    dayDetailMiddle: { flex: 1 },
+    dayDetailCategory: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    dayDetailNote: { fontSize: 12, color: theme.textMuted, marginTop: 1 },
+    dayDetailTime: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
+    dayDetailAmount: { fontSize: 14, fontWeight: '700', color: theme.text },
     summaryCard: {
       backgroundColor: theme.card,
       borderRadius: 14,

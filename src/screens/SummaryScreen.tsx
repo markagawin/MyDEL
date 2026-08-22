@@ -16,7 +16,8 @@ import { CategoryKey, Transaction } from '../types';
 export default function SummaryScreen() {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { transactions, currentCycleIdentifier, currentCycleRange, categories } = useAppData();
+  const { transactions, currentCycleIdentifier, currentCycleRange, categories, categoryMap } =
+    useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
@@ -88,7 +89,9 @@ export default function SummaryScreen() {
             style={styles.calendarButton}
             onPress={() => setCalendarVisible(true)}
           >
-            <Text style={styles.calendarButtonIcon}>📅</Text>
+            <View style={styles.calendarIcon}>
+              <View style={styles.calendarIconHeader} />
+            </View>
           </TouchableOpacity>
         </View>
         <ViewModeToggle
@@ -240,6 +243,7 @@ export default function SummaryScreen() {
       <CalendarSummaryModal
         visible={calendarVisible}
         transactions={transactions}
+        categoryMap={categoryMap}
         onClose={() => setCalendarVisible(false)}
       />
     </SafeAreaView>
@@ -266,7 +270,15 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
   },
-  calendarButtonIcon: { fontSize: 18 },
+  calendarIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: theme.navy,
+    overflow: 'hidden',
+  },
+  calendarIconHeader: { height: 6, backgroundColor: theme.navy },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
