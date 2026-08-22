@@ -20,12 +20,16 @@ import {
   DEFAULT_SETTINGS,
   loadCustomCategories,
   loadPaychecks,
+  loadProfileName,
+  loadProfilePhoto,
   loadRecurringEntries,
   loadSettings,
   loadTrackingStartDate,
   loadTransactions,
   saveCustomCategories,
   savePaychecks,
+  saveProfileName,
+  saveProfilePhoto,
   saveRecurringEntries,
   saveSettings,
   saveTrackingStartDate,
@@ -44,6 +48,10 @@ interface AppDataContextValue {
   categories: CategoryMeta[];
   categoryMap: Record<string, CategoryMeta>;
   recurringEntries: RecurringEntry[];
+  profileName: string;
+  profilePhotoUri: string | null;
+  setProfileName: (name: string) => Promise<void>;
+  setProfilePhotoUri: (uri: string | null) => Promise<void>;
   addTransaction: (input: { amount: number; category: CategoryKey; note?: string }) => string;
   deleteTransaction: (id: string) => Promise<void>;
   updateTransaction: (
@@ -79,23 +87,37 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [paychecks, setPaychecks] = useState<Record<string, number>>({});
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [recurringEntries, setRecurringEntries] = useState<RecurringEntry[]>([]);
+  const [profileName, setProfileNameState] = useState('');
+  const [profilePhotoUri, setProfilePhotoUriState] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [tx, s, trackingStart, storedPaychecks, storedCustomCategories, storedRecurring] =
-        await Promise.all([
-          loadTransactions(),
-          loadSettings(),
-          loadTrackingStartDate(),
-          loadPaychecks(),
-          loadCustomCategories(),
-          loadRecurringEntries(),
-        ]);
+      const [
+        tx,
+        s,
+        trackingStart,
+        storedPaychecks,
+        storedCustomCategories,
+        storedRecurring,
+        storedProfileName,
+        storedProfilePhoto,
+      ] = await Promise.all([
+        loadTransactions(),
+        loadSettings(),
+        loadTrackingStartDate(),
+        loadPaychecks(),
+        loadCustomCategories(),
+        loadRecurringEntries(),
+        loadProfileName(),
+        loadProfilePhoto(),
+      ]);
       setTransactions(tx);
       setSettings(s);
       setPaychecks(storedPaychecks);
       setCustomCategories(storedCustomCategories);
       setRecurringEntries(storedRecurring);
+      setProfileNameState(storedProfileName);
+      setProfilePhotoUriState(storedProfilePhoto);
       if (trackingStart) {
         setTrackingStartDate(trackingStart);
       } else {
@@ -286,6 +308,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const setProfileName = useCallback(async (name: string) => {
+    setProfileNameState(name);
+    await saveProfileName(name);
+  }, []);
+
+  const setProfilePhotoUri = useCallback(async (uri: string | null) => {
+    setProfilePhotoUriState(uri);
+    if (uri) await saveProfilePhoto(uri);
+  }, []);
+
   const exportBackup = useCallback(
     (): BackupData => ({
       version: 1,
@@ -296,8 +328,19 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       paychecks,
       customCategories,
       recurringEntries,
+      profileName,
+      profilePhotoUri,
     }),
-    [transactions, settings, trackingStartDate, paychecks, customCategories, recurringEntries]
+    [
+      transactions,
+      settings,
+      trackingStartDate,
+      paychecks,
+      customCategories,
+      recurringEntries,
+      profileName,
+      profilePhotoUri,
+    ]
   );
 
   const restoreFromBackup = useCallback(async (data: BackupData) => {
@@ -306,6 +349,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const nextPaychecks = data.paychecks ?? {};
     const nextCustomCategories = data.customCategories ?? [];
     const nextRecurringEntries = data.recurringEntries ?? [];
+    const nextProfileName = data.profileName ?? '';
+    const nextProfilePhotoUri = data.profilePhotoUri ?? null;
 
     await Promise.all([
       saveTransactions(nextTransactions),
@@ -313,6 +358,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       savePaychecks(nextPaychecks),
       saveCustomCategories(nextCustomCategories),
       saveRecurringEntries(nextRecurringEntries),
+      saveProfileName(nextProfileName),
+      nextProfilePhotoUri ? saveProfilePhoto(nextProfilePhotoUri) : Promise.resolve(),
       data.trackingStartDate ? saveTrackingStartDate(data.trackingStartDate) : Promise.resolve(),
     ]);
 
@@ -321,6 +368,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setPaychecks(nextPaychecks);
     setCustomCategories(nextCustomCategories);
     setRecurringEntries(nextRecurringEntries);
+    setProfileNameState(nextProfileName);
+    setProfilePhotoUriState(nextProfilePhotoUri);
     if (data.trackingStartDate) setTrackingStartDate(data.trackingStartDate);
   }, []);
 
@@ -334,6 +383,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     categories,
     categoryMap,
     recurringEntries,
+    profileName,
+    profilePhotoUri,
+    setProfileName,
+    setProfilePhotoUri,
     addTransaction,
     deleteTransaction,
     updateTransaction,

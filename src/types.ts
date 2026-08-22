@@ -50,4 +50,6 @@ export interface BackupData {
   paychecks: Record<string, number>;
   customCategories: CustomCategory[];
   recurringEntries: RecurringEntry[];
+  profileName?: string;
+  profilePhotoUri?: string | null;
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -36,6 +37,8 @@ export default function QuickLogScreen() {
     deleteTransaction,
     setCurrentPaycheck,
     addCategory,
+    profileName,
+    profilePhotoUri,
   } = useAppData();
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
@@ -119,10 +122,26 @@ export default function QuickLogScreen() {
             </View>
             <TouchableOpacity
               accessibilityLabel="Settings"
-              style={styles.gearButton}
+              style={styles.profileCluster}
               onPress={() => navigation.navigate('Settings')}
             >
-              <Text style={styles.gearIcon}>⚙️</Text>
+              {profileName ? (
+                <Text style={styles.profileName} numberOfLines={1}>
+                  {profileName}
+                </Text>
+              ) : null}
+              <View style={styles.avatarWrap}>
+                {profilePhotoUri ? (
+                  <Image source={{ uri: profilePhotoUri }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarInitial}>
+                    {profileName.trim() ? profileName.trim().charAt(0).toUpperCase() : '🙂'}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.gearButton}>
+                <Text style={styles.gearIcon}>⚙️</Text>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -272,6 +291,21 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   appName: { fontSize: 26, fontWeight: '800', color: theme.navy },
   appSubtitle: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
+  profileCluster: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  profileName: { fontSize: 12.5, fontWeight: '600', color: theme.textMuted, maxWidth: 70 },
+  avatarWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+    overflow: 'hidden',
+  },
+  avatarImage: { width: 36, height: 36, borderRadius: 18 },
+  avatarInitial: { fontSize: 15, fontWeight: '700', color: theme.navy },
   gearButton: {
     width: 40,
     height: 40,

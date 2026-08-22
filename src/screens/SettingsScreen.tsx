@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   Platform,
   ScrollView,
   Share,
@@ -16,6 +17,7 @@ import { CycleMode, RecurringEntry } from '../types';
 import { formatFullDate, parseIsoDateOnly, toIsoDateOnly } from '../cycleEngine';
 import { formatPeso } from '../currency';
 import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMask';
+import { pickProfilePhoto } from '../imagePicker';
 import CustomRangeBar from '../components/CustomRangeBar';
 import AddCategoryModal from '../components/AddCategoryModal';
 import AddRecurringEntryModal from '../components/AddRecurringEntryModal';
@@ -101,6 +103,10 @@ export default function SettingsScreen() {
     removeRecurringEntry,
     exportBackup,
     restoreFromBackup,
+    profileName,
+    profilePhotoUri,
+    setProfileName,
+    setProfilePhotoUri,
   } = useAppData();
   const [customDateText, setCustomDateText] = useState(() =>
     formatDateMask(digitsFromDate(parseIsoDateOnly(settings.customAnchorDate)))
@@ -111,6 +117,16 @@ export default function SettingsScreen() {
   const [addRecurringVisible, setAddRecurringVisible] = useState(false);
   const [pendingRemoveRecurring, setPendingRemoveRecurring] = useState<RecurringEntry | null>(null);
   const [importVisible, setImportVisible] = useState(false);
+  const [nameDraft, setNameDraft] = useState(profileName);
+
+  useEffect(() => {
+    setNameDraft(profileName);
+  }, [profileName]);
+
+  const handlePickPhoto = async () => {
+    const uri = await pickProfilePhoto();
+    if (uri) setProfilePhotoUri(uri);
+  };
 
   const usageCountByCategory = useMemo(() => {
     const counts = new Map<string, number>();
@@ -166,7 +182,37 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-        <Text style={styles.title}>Appearance</Text>
+        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.subtitle}>Set your name and photo, shown next to Settings.</Text>
+        <View style={styles.profileRow}>
+          <TouchableOpacity
+            accessibilityLabel="Change profile photo"
+            style={styles.profileAvatarWrap}
+            onPress={handlePickPhoto}
+          >
+            {profilePhotoUri ? (
+              <Image source={{ uri: profilePhotoUri }} style={styles.profileAvatarImage} />
+            ) : (
+              <Text style={styles.profileAvatarInitial}>
+                {nameDraft.trim() ? nameDraft.trim().charAt(0).toUpperCase() : '🙂'}
+              </Text>
+            )}
+            <View style={styles.profileAvatarEditBadge}>
+              <Text style={styles.profileAvatarEditIcon}>✎</Text>
+            </View>
+          </TouchableOpacity>
+          <TextInput
+            style={[styles.profileNameInput, noWebOutline]}
+            value={nameDraft}
+            onChangeText={setNameDraft}
+            onBlur={() => setProfileName(nameDraft.trim())}
+            placeholder="Your name"
+            placeholderTextColor={theme.textMuted}
+            maxLength={40}
+          />
+        </View>
+
+        <Text style={[styles.title, styles.sectionSpacing]}>Appearance</Text>
         <Text style={styles.subtitle}>Choose how MyDEL looks, or follow your system setting.</Text>
         <View style={styles.appearanceRow}>
           {APPEARANCE_OPTIONS.map((opt) => {
@@ -416,6 +462,44 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   title: { fontSize: 24, fontWeight: '800', color: theme.navy, marginBottom: 6 },
   subtitle: { fontSize: 13, color: theme.textMuted, marginBottom: 20 },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 },
+  profileAvatarWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarImage: { width: 64, height: 64, borderRadius: 32 },
+  profileAvatarInitial: { fontSize: 24, fontWeight: '800', color: theme.navy },
+  profileAvatarEditBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.background,
+  },
+  profileAvatarEditIcon: { fontSize: 10, color: '#FFFFFF' },
+  profileNameInput: {
+    flex: 1,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: theme.text,
+  },
   appearanceRow: {
     flexDirection: 'row',
     backgroundColor: theme.background,

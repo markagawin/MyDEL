@@ -203,21 +203,18 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
                   );
                 })
               )}
-
-              {selectedDayTransactions.length > 0 && (
-                <View style={styles.dayDetailTotalRow}>
-                  <Text style={styles.dayDetailTotalLabel}>Total for this day</Text>
-                  <Text style={styles.dayDetailTotalValue}>{formatPeso(selectedDayTotal)}</Text>
-                </View>
-              )}
             </View>
           )}
 
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>
-              Total spent — {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
+              {selectedDate
+                ? `Total spent — ${formatFullDate(selectedDate)}`
+                : `Total spent — ${MONTH_NAMES[cursor.getMonth()]} ${cursor.getFullYear()}`}
             </Text>
-            <Text style={styles.summaryValue}>{formatPeso(monthTotal)}</Text>
+            <Text style={styles.summaryValue}>
+              {formatPeso(selectedDate ? selectedDayTotal : monthTotal)}
+            </Text>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -338,17 +335,6 @@ const createStyles = (theme: AppTheme) =>
     dayDetailNote: { fontSize: 12, color: theme.textMuted, marginTop: 1 },
     dayDetailTime: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
     dayDetailAmount: { fontSize: 14, fontWeight: '700', color: theme.text },
-    dayDetailTotalRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: 10,
-      marginTop: 4,
-      borderTopWidth: 1.5,
-      borderTopColor: theme.border,
-    },
-    dayDetailTotalLabel: { fontSize: 12.5, fontWeight: '700', color: theme.textMuted },
-    dayDetailTotalValue: { fontSize: 15, fontWeight: '800', color: theme.navy },
     summaryCard: {
       backgroundColor: theme.card,
       borderRadius: 14,

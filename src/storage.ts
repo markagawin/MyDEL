@@ -8,6 +8,8 @@ const PAYCHECKS_KEY = '@mydel/paychecks';
 const CUSTOM_CATEGORIES_KEY = '@mydel/customCategories';
 const THEME_PREFERENCE_KEY = '@mydel/themePreference';
 const RECURRING_ENTRIES_KEY = '@mydel/recurringEntries';
+const PROFILE_NAME_KEY = '@mydel/profileName';
+const PROFILE_PHOTO_KEY = '@mydel/profilePhoto';
 
 export const DEFAULT_SETTINGS: CycleSettings = {
   mode: 'monthly',
@@ -104,4 +106,21 @@ export async function loadThemePreference(): Promise<string | null> {
 
 export async function saveThemePreference(preference: string): Promise<void> {
   await AsyncStorage.setItem(THEME_PREFERENCE_KEY, preference);
+}
+
+export async function loadProfileName(): Promise<string> {
+  return (await AsyncStorage.getItem(PROFILE_NAME_KEY)) ?? '';
+}
+
+export async function saveProfileName(name: string): Promise<void> {
+  await AsyncStorage.setItem(PROFILE_NAME_KEY, name);
+}
+
+/** Data URI of the user's profile photo, or null if never set. */
+export async function loadProfilePhoto(): Promise<string | null> {
+  return AsyncStorage.getItem(PROFILE_PHOTO_KEY);
+}
+
+export async function saveProfilePhoto(uri: string): Promise<void> {
+  await AsyncStorage.setItem(PROFILE_PHOTO_KEY, uri);
 }
