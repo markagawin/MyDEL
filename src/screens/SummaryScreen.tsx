@@ -10,6 +10,7 @@ import DonutChart from '../components/DonutChart';
 import CyclePickerModal from '../components/CyclePickerModal';
 import CustomRangeBar from '../components/CustomRangeBar';
 import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
+import CalendarSummaryModal from '../components/CalendarSummaryModal';
 import { CategoryKey, Transaction } from '../types';
 
 export default function SummaryScreen() {
@@ -20,6 +21,7 @@ export default function SummaryScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('cycle');
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
 
@@ -79,7 +81,16 @@ export default function SummaryScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Summary</Text>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.headerTitle}>Summary</Text>
+          <TouchableOpacity
+            accessibilityLabel="Calendar view"
+            style={styles.calendarButton}
+            onPress={() => setCalendarVisible(true)}
+          >
+            <Text style={styles.calendarButtonIcon}>📅</Text>
+          </TouchableOpacity>
+        </View>
         <ViewModeToggle
           mode={viewMode}
           onChange={(m) => {
@@ -225,6 +236,12 @@ export default function SummaryScreen() {
         }}
         onClose={() => setPickerVisible(false)}
       />
+
+      <CalendarSummaryModal
+        visible={calendarVisible}
+        transactions={transactions}
+        onClose={() => setCalendarVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -232,7 +249,24 @@ export default function SummaryScreen() {
 const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: theme.navy, marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: theme.navy },
+  calendarButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  calendarButtonIcon: { fontSize: 18 },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
