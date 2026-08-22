@@ -15,7 +15,7 @@ export const CATEGORIES: CategoryMeta[] = [
   { key: 'bills', label: 'Bills', icon: '💡', color: '#F59E0B' },
   { key: 'creditCard', label: 'Credit Card', icon: '💳', color: '#EC4899' },
   { key: 'savings', label: 'Savings', icon: '💰', color: '#10B981' },
-  { key: 'extra', label: 'Extra', icon: '🛍️', color: '#6B7280' },
+  { key: 'extra', label: 'Shopping', icon: '🛍️', color: '#6B7280' },
 ];
 
 export const CATEGORY_MAP: Record<CategoryKey, CategoryMeta> = CATEGORIES.reduce(
