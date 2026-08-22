@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: CycleSettings = {
   customAnchorDate: '2025-01-05',
   customRangeStart: '2025-01-01',
   customRangeEnd: '2025-01-31',
+  customDates: [],
 };
 
 export async function loadTransactions(): Promise<Transaction[]> {

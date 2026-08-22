@@ -23,6 +23,7 @@ import AddCategoryModal from '../components/AddCategoryModal';
 import AddRecurringEntryModal from '../components/AddRecurringEntryModal';
 import ImportBackupModal from '../components/ImportBackupModal';
 import ConfirmModal from '../components/ConfirmModal';
+import DatePickerModal from '../components/DatePickerModal';
 import { AppTheme, ThemePreference, useTheme, useThemePreference } from '../theme';
 import { noWebOutline } from '../webInputStyle';
 
@@ -57,6 +58,11 @@ const MODE_OPTIONS: { mode: CycleMode; title: string; description: string }[] = 
     mode: 'customRange',
     title: 'Custom Date Range',
     description: 'Pick an exact start and end date (e.g., Aug 24 – Sep 10); that same length repeats going forward.',
+  },
+  {
+    mode: 'customDates',
+    title: 'Custom Payday Calendar',
+    description: 'Enter your exact payout dates from your payroll calendar; each cycle runs from one payout to the day before the next.',
   },
 ];
 
@@ -118,6 +124,25 @@ export default function SettingsScreen() {
   const [pendingRemoveRecurring, setPendingRemoveRecurring] = useState<RecurringEntry | null>(null);
   const [importVisible, setImportVisible] = useState(false);
   const [nameDraft, setNameDraft] = useState(profileName);
+  const [addPayoutDateVisible, setAddPayoutDateVisible] = useState(false);
+
+  const sortedCustomDates = useMemo(
+    () => [...(settings.customDates ?? [])].sort(),
+    [settings.customDates]
+  );
+
+  const handleAddPayoutDate = (date: Date) => {
+    const iso = toIsoDateOnly(date);
+    const next = Array.from(new Set([...(settings.customDates ?? []), iso])).sort();
+    updateSettings({ ...settings, customDates: next });
+  };
+
+  const handleRemovePayoutDate = (iso: string) => {
+    updateSettings({
+      ...settings,
+      customDates: (settings.customDates ?? []).filter((d) => d !== iso),
+    });
+  };
 
   useEffect(() => {
     setNameDraft(profileName);
@@ -300,6 +325,39 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               )}
+
+              {opt.mode === 'customDates' && active && (
+                <View style={styles.customBlock}>
+                  <Text style={styles.customLabel}>Payout dates</Text>
+                  {sortedCustomDates.length === 0 ? (
+                    <Text style={styles.customHint}>
+                      No payout dates yet — add the dates from your payroll calendar.
+                    </Text>
+                  ) : (
+                    <View style={styles.payoutDateList}>
+                      {sortedCustomDates.map((iso) => (
+                        <View key={iso} style={styles.payoutDateChip}>
+                          <Text style={styles.payoutDateChipText}>
+                            {formatFullDate(parseIsoDateOnly(iso))}
+                          </Text>
+                          <TouchableOpacity
+                            accessibilityLabel={`Remove ${iso}`}
+                            onPress={() => handleRemovePayoutDate(iso)}
+                          >
+                            <Text style={styles.payoutDateRemoveIcon}>×</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.addPayoutDateButton}
+                    onPress={() => setAddPayoutDateVisible(true)}
+                  >
+                    <Text style={styles.addPayoutDateButtonText}>+ Add Payout Date</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -454,6 +512,13 @@ export default function SettingsScreen() {
         onImport={restoreFromBackup}
         onClose={() => setImportVisible(false)}
       />
+
+      <DatePickerModal
+        visible={addPayoutDateVisible}
+        value={new Date()}
+        onChange={handleAddPayoutDate}
+        onClose={() => setAddPayoutDateVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -564,6 +629,27 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   customInputError: { borderColor: theme.danger },
   customHint: { fontSize: 12, color: theme.textMuted, marginTop: 8 },
   errorText: { fontSize: 12, color: theme.danger, marginTop: 8 },
+  payoutDateList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  payoutDateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.background,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  payoutDateChipText: { fontSize: 12.5, fontWeight: '600', color: theme.text },
+  payoutDateRemoveIcon: { fontSize: 15, color: theme.textMuted, fontWeight: '700' },
+  addPayoutDateButton: {
+    borderWidth: 1.5,
+    borderColor: theme.navy,
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  addPayoutDateButtonText: { color: theme.navy, fontWeight: '700', fontSize: 13 },
   sectionSpacing: { marginTop: 12 },
   categoryList: { marginBottom: 16 },
   categoryRow: {

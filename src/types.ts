@@ -24,7 +24,7 @@ export interface RecurringEntry {
   note?: string;
 }
 
-export type CycleMode = 'monthly' | 'semiA' | 'semiB' | 'custom' | 'customRange';
+export type CycleMode = 'monthly' | 'semiA' | 'semiB' | 'custom' | 'customRange' | 'customDates';
 
 export interface CycleSettings {
   mode: CycleMode;
@@ -32,6 +32,7 @@ export interface CycleSettings {
   customAnchorDate: string; // "yyyy-MM-dd" date the user picked; its day-of-month drives the recurring reset
   customRangeStart: string; // "yyyy-MM-dd"; used when mode === 'customRange'
   customRangeEnd: string; // "yyyy-MM-dd", inclusive; its length repeats indefinitely from customRangeStart
+  customDates: string[]; // "yyyy-MM-dd" payout dates, used when mode === 'customDates'; each cycle runs from one payout date to the day before the next
 }
 
 export interface CycleRange {
