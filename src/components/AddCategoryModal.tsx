@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { CATEGORY_COLOR_CHOICES, CATEGORY_ICON_CHOICES } from '../categories';
 import { AppTheme, useTheme } from '../theme';
+import { noWebOutline } from '../webInputStyle';
 
 interface Props {
   visible: boolean;
@@ -60,7 +61,7 @@ export default function AddCategoryModal({ visible, categoryCount, onSave, onClo
 
             <Text style={styles.fieldLabel}>NAME</Text>
             <TextInput
-              style={styles.nameInput}
+              style={[styles.nameInput, noWebOutline]}
               value={label}
               onChangeText={setLabel}
               placeholder="e.g. Rent"

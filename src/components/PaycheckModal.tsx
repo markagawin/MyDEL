@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AppTheme, useTheme } from '../theme';
+import { noWebOutline } from '../webInputStyle';
 
 interface Props {
   visible: boolean;
@@ -44,7 +45,7 @@ export default function PaycheckModal({ visible, currentAmount, onSave, onClose 
           <View style={styles.inputWrap}>
             <Text style={styles.pesoSign}>₱</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, noWebOutline]}
               value={text}
               onChangeText={(v) => setText(v.replace(/[^0-9.]/g, ''))}
               placeholder="0.00"

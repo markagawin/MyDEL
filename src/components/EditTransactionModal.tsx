@@ -12,6 +12,7 @@ import {
 import { CategoryMeta } from '../categories';
 import { CategoryKey, Transaction } from '../types';
 import { AppTheme, useTheme } from '../theme';
+import { noWebOutline } from '../webInputStyle';
 
 interface Props {
   transaction: Transaction | null;
@@ -55,7 +56,7 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
             <View style={styles.amountWrap}>
               <Text style={styles.pesoSign}>₱</Text>
               <TextInput
-                style={styles.amountInput}
+                style={[styles.amountInput, noWebOutline]}
                 value={amountText}
                 onChangeText={(v) => setAmountText(v.replace(/[^0-9.]/g, ''))}
                 placeholder="0.00"
@@ -92,7 +93,7 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
 
             <Text style={styles.fieldLabel}>NOTE (OPTIONAL)</Text>
             <TextInput
-              style={styles.noteInput}
+              style={[styles.noteInput, noWebOutline]}
               value={note}
               onChangeText={setNote}
               placeholder="e.g. Lunch with team"

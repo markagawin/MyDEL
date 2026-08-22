@@ -12,6 +12,7 @@ import {
 import { CategoryMeta } from '../categories';
 import { CategoryKey } from '../types';
 import { AppTheme, useTheme } from '../theme';
+import { noWebOutline } from '../webInputStyle';
 
 interface Props {
   visible: boolean;
@@ -59,7 +60,7 @@ export default function AddRecurringEntryModal({ visible, categories, onSave, on
             <View style={styles.amountWrap}>
               <Text style={styles.pesoSign}>₱</Text>
               <TextInput
-                style={styles.amountInput}
+                style={[styles.amountInput, noWebOutline]}
                 value={amountText}
                 onChangeText={(v) => setAmountText(v.replace(/[^0-9.]/g, ''))}
                 placeholder="0.00"
@@ -96,7 +97,7 @@ export default function AddRecurringEntryModal({ visible, categories, onSave, on
 
             <Text style={styles.fieldLabel}>NOTE (OPTIONAL)</Text>
             <TextInput
-              style={styles.noteInput}
+              style={[styles.noteInput, noWebOutline]}
               value={note}
               onChangeText={setNote}
               placeholder="e.g. Rent"

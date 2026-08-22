@@ -19,6 +19,7 @@ import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
 import Toast from '../components/Toast';
+import { noWebOutline } from '../webInputStyle';
 
 export default function QuickLogScreen() {
   const navigation = useNavigation<any>();
@@ -172,7 +173,7 @@ export default function QuickLogScreen() {
             <Text style={styles.pesoSign}>₱</Text>
             <TextInput
               ref={amountInputRef}
-              style={styles.amountInput}
+              style={[styles.amountInput, noWebOutline]}
               value={amountText}
               onChangeText={(v) => setAmountText(v.replace(/[^0-9.]/g, ''))}
               onFocus={() => setAmountBlurred(false)}
@@ -220,7 +221,7 @@ export default function QuickLogScreen() {
           <View style={styles.noteWrap}>
             <Text style={styles.noteIcon}>📝</Text>
             <TextInput
-              style={styles.noteInput}
+              style={[styles.noteInput, noWebOutline]}
               value={note}
               onChangeText={setNote}
               placeholder="e.g. Lunch with team"

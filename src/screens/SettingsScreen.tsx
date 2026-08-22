@@ -22,6 +22,7 @@ import AddRecurringEntryModal from '../components/AddRecurringEntryModal';
 import ImportBackupModal from '../components/ImportBackupModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { AppTheme, ThemePreference, useTheme, useThemePreference } from '../theme';
+import { noWebOutline } from '../webInputStyle';
 
 const APPEARANCE_OPTIONS: { pref: ThemePreference; title: string }[] = [
   { pref: 'system', title: 'System' },
@@ -212,7 +213,7 @@ export default function SettingsScreen() {
                 <View style={styles.customBlock}>
                   <Text style={styles.customLabel}>Anchor date</Text>
                   <TextInput
-                    style={[styles.customInput, dateError && styles.customInputError]}
+                    style={[styles.customInput, dateError && styles.customInputError, noWebOutline]}
                     value={customDateText}
                     onChangeText={handleCustomDateChange}
                     onBlur={commitCustomDate}

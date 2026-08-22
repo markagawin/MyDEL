@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { BackupData } from '../types';
 import { AppTheme, useTheme } from '../theme';
+import { noWebOutline } from '../webInputStyle';
 
 interface Props {
   visible: boolean;
@@ -87,7 +88,7 @@ export default function ImportBackupModal({ visible, onImport, onClose }: Props)
           )}
 
           <TextInput
-            style={styles.textArea}
+            style={[styles.textArea, noWebOutline]}
             value={text}
             onChangeText={setText}
             placeholder="{ ... }"

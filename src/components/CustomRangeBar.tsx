@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View }
 import { formatFullDate, startOfDay } from '../cycleEngine';
 import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMask';
 import { AppTheme, useTheme } from '../theme';
+import { noWebOutline } from '../webInputStyle';
 
 interface Props {
   start: Date;
@@ -62,7 +63,7 @@ export default function CustomRangeBar({ start, end, onChange }: Props) {
               <Text style={styles.sheetTitle}>{editing === 'start' ? 'From date' : 'To date'}</Text>
               <Text style={styles.sheetHint}>Enter as MM/DD/YYYY</Text>
               <TextInput
-                style={[styles.dateInput, error && styles.dateInputError]}
+                style={[styles.dateInput, error && styles.dateInputError, noWebOutline]}
                 value={text}
                 onChangeText={handleTextChange}
                 placeholder="MM/DD/YYYY"
