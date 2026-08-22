@@ -85,6 +85,11 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [transactions, selectedDate]);
 
+  const selectedDayTotal = useMemo(
+    () => selectedDayTransactions.reduce((sum, t) => sum + t.amount, 0),
+    [selectedDayTransactions]
+  );
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -197,6 +202,13 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
                     </View>
                   );
                 })
+              )}
+
+              {selectedDayTransactions.length > 0 && (
+                <View style={styles.dayDetailTotalRow}>
+                  <Text style={styles.dayDetailTotalLabel}>Total for this day</Text>
+                  <Text style={styles.dayDetailTotalValue}>{formatPeso(selectedDayTotal)}</Text>
+                </View>
               )}
             </View>
           )}
@@ -326,6 +338,17 @@ const createStyles = (theme: AppTheme) =>
     dayDetailNote: { fontSize: 12, color: theme.textMuted, marginTop: 1 },
     dayDetailTime: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
     dayDetailAmount: { fontSize: 14, fontWeight: '700', color: theme.text },
+    dayDetailTotalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 10,
+      marginTop: 4,
+      borderTopWidth: 1.5,
+      borderTopColor: theme.border,
+    },
+    dayDetailTotalLabel: { fontSize: 12.5, fontWeight: '700', color: theme.textMuted },
+    dayDetailTotalValue: { fontSize: 15, fontWeight: '800', color: theme.navy },
     summaryCard: {
       backgroundColor: theme.card,
       borderRadius: 14,
