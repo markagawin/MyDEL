@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Transaction } from '../types';
+import { CycleRange, Transaction } from '../types';
 import { CategoryMeta, UNKNOWN_CATEGORY } from '../categories';
 import { formatPeso, formatPesoCompact } from '../currency';
 import { formatFullDate, formatTimeOfDay, sameDay, toIsoDateOnly } from '../cycleEngine';
@@ -12,6 +12,7 @@ interface Props {
   visible: boolean;
   transactions: Transaction[];
   categoryMap: Record<string, CategoryMeta>;
+  currentCycleRange: CycleRange;
   onClose: () => void;
 }
 
@@ -27,7 +28,13 @@ function startOfWeekMonday(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
 }
 
-export default function CalendarSummaryModal({ visible, transactions, categoryMap, onClose }: Props) {
+export default function CalendarSummaryModal({
+  visible,
+  transactions,
+  categoryMap,
+  currentCycleRange,
+  onClose,
+}: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const today = useMemo(() => new Date(), [visible]);
@@ -93,6 +100,14 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
         .reduce((sum, t) => sum + t.amount, 0),
     [selectedDayTransactions]
   );
+
+  // The active payday cycle, independent of whichever calendar month is being browsed —
+  // a cycle like "Aug 24 – Sep 7" can span two calendar months.
+  const cycleTotal = useMemo(() => {
+    return transactions
+      .filter((t) => t.cycleIdentifier === currentCycleRange.identifier && !isSavingsTransaction(t))
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [transactions, currentCycleRange]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -218,6 +233,13 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
               )}
             </View>
           )}
+
+          <View style={styles.cycleSummaryCard}>
+            <Text style={styles.cycleSummaryLabel}>
+              Total spent — {currentCycleRange.label}
+            </Text>
+            <Text style={styles.cycleSummaryValue}>{formatPeso(cycleTotal)}</Text>
+          </View>
 
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>
@@ -360,4 +382,13 @@ const createStyles = (theme: AppTheme) =>
     },
     summaryLabel: { fontSize: 12.5, color: theme.textMuted, marginBottom: 4 },
     summaryValue: { fontSize: 22, fontWeight: '800', color: theme.text },
+    cycleSummaryCard: {
+      backgroundColor: theme.navy,
+      borderRadius: 14,
+      padding: 16,
+      marginTop: 16,
+      alignItems: 'center',
+    },
+    cycleSummaryLabel: { fontSize: 12.5, color: '#9FB2D6', marginBottom: 4 },
+    cycleSummaryValue: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
   });

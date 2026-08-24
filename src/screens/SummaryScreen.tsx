@@ -285,6 +285,7 @@ export default function SummaryScreen() {
         visible={calendarVisible}
         transactions={transactions}
         categoryMap={categoryMap}
+        currentCycleRange={currentCycleRange}
         onClose={() => setCalendarVisible(false)}
       />
 
