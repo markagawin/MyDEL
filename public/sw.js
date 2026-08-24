@@ -1,6 +1,11 @@
 const CACHE_NAME = 'mydel-cache-v1';
+// self.registration.scope resolves to wherever this worker is actually hosted
+// (e.g. https://markagawin.github.io/MyDEL/), unlike a hardcoded '/' which only
+// matches a site served from the domain root.
+const APP_SHELL_URL = self.registration.scope;
 
-self.addEventListener('install', () => {
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.add(APP_SHELL_URL)).catch(() => {}));
   self.skipWaiting();
 });
 
@@ -26,7 +31,7 @@ self.addEventListener('fetch', (event) => {
       .catch(() =>
         caches
           .match(event.request)
-          .then((cached) => cached || caches.match('/'))
+          .then((cached) => cached || caches.match(APP_SHELL_URL))
       )
   );
 });
