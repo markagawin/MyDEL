@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
 import { CategoryKey } from '../types';
@@ -24,6 +25,7 @@ import Toast from '../components/Toast';
 import { noWebOutline } from '../webInputStyle';
 
 export default function QuickLogScreen() {
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -139,7 +141,11 @@ export default function QuickLogScreen() {
               <Text style={styles.appName}>MyDEL</Text>
               <Text style={styles.appSubtitle}>My Daily Expenses in Life</Text>
             </View>
-            <View style={styles.profileCluster}>
+            <TouchableOpacity
+              accessibilityLabel="Settings"
+              style={styles.profileCluster}
+              onPress={() => navigation.navigate('Settings')}
+            >
               {profileName ? (
                 <Text style={styles.profileName} numberOfLines={1}>
                   {profileName}
@@ -154,7 +160,7 @@ export default function QuickLogScreen() {
                   </Text>
                 )}
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.banner}>
