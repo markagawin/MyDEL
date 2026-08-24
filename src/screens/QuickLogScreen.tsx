@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -49,6 +50,7 @@ export default function QuickLogScreen() {
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
   const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [showTotalOnly, setShowTotalOnly] = useState(false);
   const [amountBlurred, setAmountBlurred] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -61,6 +63,24 @@ export default function QuickLogScreen() {
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    setShowTotalOnly(false);
+  }, [currentCycleIdentifier]);
+
+  const bannerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 10,
+        onPanResponderRelease: (_, gesture) => {
+          if (Math.abs(gesture.dx) > 40) {
+            setShowTotalOnly((prev) => !prev);
+          }
+        },
+      }),
+    []
+  );
 
   const cycleLabel = currentCycleRange.label;
 
@@ -163,7 +183,7 @@ export default function QuickLogScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.banner}>
+          <View style={styles.banner} {...(currentPaycheck !== null ? bannerPanResponder.panHandlers : {})}>
             <View style={styles.bannerTopRow}>
               <Text style={styles.bannerLabel}>Current Period: {cycleLabel}</Text>
               <TouchableOpacity onPress={() => setPaycheckModalVisible(true)}>
@@ -173,7 +193,7 @@ export default function QuickLogScreen() {
               </TouchableOpacity>
             </View>
 
-            {currentPaycheck !== null && remaining !== null ? (
+            {currentPaycheck !== null && remaining !== null && !showTotalOnly ? (
               <>
                 <Text
                   style={[styles.bannerTotal, remaining < 0 && styles.bannerTotalDanger]}
@@ -202,6 +222,17 @@ export default function QuickLogScreen() {
                 <Text style={styles.bannerTotal}>{formatPeso(periodTotal)}</Text>
                 <Text style={styles.bannerSub}>Total spent so far</Text>
               </>
+            )}
+
+            {currentPaycheck !== null && (
+              <View style={styles.bannerDots}>
+                <TouchableOpacity onPress={() => setShowTotalOnly(false)}>
+                  <View style={[styles.bannerDot, !showTotalOnly && styles.bannerDotActive]} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowTotalOnly(true)}>
+                  <View style={[styles.bannerDot, showTotalOnly && styles.bannerDotActive]} />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -384,6 +415,19 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: '#5FE3A1',
   },
   progressFillDanger: { backgroundColor: '#FF6B6B' },
+  bannerDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  bannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  bannerDotActive: { backgroundColor: '#FFFFFF' },
   amountWrap: {
     flexDirection: 'row',
     alignItems: 'center',
