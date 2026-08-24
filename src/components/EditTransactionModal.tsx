@@ -11,13 +11,18 @@ import {
 } from 'react-native';
 import { CategoryMeta } from '../categories';
 import { CategoryKey, Transaction } from '../types';
+import { formatFullDate, sameDay } from '../cycleEngine';
 import { AppTheme, useTheme } from '../theme';
 import { noWebOutline } from '../webInputStyle';
+import DatePickerModal from './DatePickerModal';
 
 interface Props {
   transaction: Transaction | null;
   categories: CategoryMeta[];
-  onSave: (id: string, input: { amount: number; category: CategoryKey; note?: string }) => void;
+  onSave: (
+    id: string,
+    input: { amount: number; category: CategoryKey; note?: string; timestamp: Date }
+  ) => void;
   onClose: () => void;
 }
 
@@ -27,12 +32,15 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [note, setNote] = useState('');
+  const [entryDate, setEntryDate] = useState(() => new Date());
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
 
   useEffect(() => {
     if (transaction) {
       setAmountText(String(transaction.amount));
       setCategory(transaction.category);
       setNote(transaction.note ?? '');
+      setEntryDate(new Date(transaction.timestamp));
     }
   }, [transaction]);
 
@@ -41,12 +49,23 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
 
   const handleSave = () => {
     if (!canSave || category === null || !transaction) return;
-    onSave(transaction.id, { amount: amountValue, category, note: note.trim() || undefined });
+    const original = new Date(transaction.timestamp);
+    const timestamp = new Date(
+      entryDate.getFullYear(),
+      entryDate.getMonth(),
+      entryDate.getDate(),
+      original.getHours(),
+      original.getMinutes(),
+      original.getSeconds(),
+      original.getMilliseconds()
+    );
+    onSave(transaction.id, { amount: amountValue, category, note: note.trim() || undefined, timestamp });
     onClose();
   };
 
   return (
-    <Modal visible={transaction !== null} animationType="fade" transparent onRequestClose={onClose}>
+    <>
+      <Modal visible={transaction !== null} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <ScrollView keyboardShouldPersistTaps="handled">
@@ -100,6 +119,15 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
               placeholderTextColor={theme.textMuted}
             />
 
+            <Text style={styles.fieldLabel}>DATE</Text>
+            <TouchableOpacity style={styles.dateWrap} onPress={() => setDatePickerVisible(true)}>
+              <Text style={styles.dateIcon}>📅</Text>
+              <Text style={styles.dateText}>
+                {formatFullDate(entryDate)}
+                {sameDay(entryDate, new Date()) ? ' (Today)' : ''}
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.buttonRow}>
               <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -115,7 +143,16 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
           </ScrollView>
         </Pressable>
       </Pressable>
-    </Modal>
+      </Modal>
+
+      <DatePickerModal
+        visible={datePickerVisible}
+        value={entryDate}
+        maxDate={new Date()}
+        onChange={setEntryDate}
+        onClose={() => setDatePickerVisible(false)}
+      />
+    </>
   );
 }
 
@@ -185,8 +222,21 @@ const createStyles = (theme: AppTheme) =>
       paddingVertical: 10,
       fontSize: 14,
       color: theme.text,
+      marginBottom: 14,
+    },
+    dateWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.background,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
       marginBottom: 18,
     },
+    dateIcon: { fontSize: 15, marginRight: 8 },
+    dateText: { fontSize: 14, fontWeight: '600', color: theme.text },
     buttonRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
     cancelButton: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10 },
     cancelButtonText: { color: theme.textMuted, fontWeight: '700', fontSize: 14 },

@@ -68,7 +68,7 @@ interface AppDataContextValue {
   deleteTransaction: (id: string) => Promise<void>;
   updateTransaction: (
     id: string,
-    input: { amount: number; category: CategoryKey; note?: string }
+    input: { amount: number; category: CategoryKey; note?: string; timestamp?: Date }
   ) => Promise<void>;
   updateSettings: (settings: CycleSettings) => Promise<void>;
   setCurrentPaycheck: (amount: number | null) => Promise<void>;
@@ -195,23 +195,33 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateTransaction = useCallback(
-    async (id: string, input: { amount: number; category: CategoryKey; note?: string }) => {
+    async (
+      id: string,
+      input: { amount: number; category: CategoryKey; note?: string; timestamp?: Date }
+    ) => {
       setTransactions((prev) => {
-        const next = prev.map((t) =>
-          t.id === id
-            ? {
-                ...t,
-                amount: input.amount,
-                category: input.category,
-                note: input.note && input.note.trim().length > 0 ? input.note.trim() : undefined,
-              }
-            : t
-        );
+        const next = prev.map((t) => {
+          if (t.id !== id) return t;
+          const updated: Transaction = {
+            ...t,
+            amount: input.amount,
+            category: input.category,
+            note: input.note && input.note.trim().length > 0 ? input.note.trim() : undefined,
+          };
+          if (input.timestamp) {
+            updated.timestamp = input.timestamp.toISOString();
+            updated.cycleIdentifier = clipRangeToTrackingStart(
+              getCycleRangeForDate(input.timestamp, settings),
+              trackingStartAsDate
+            ).identifier;
+          }
+          return updated;
+        });
         saveTransactions(next);
         return next;
       });
     },
-    []
+    [settings, trackingStartAsDate]
   );
 
   // Auto-log any recurring entry that hasn't already produced a transaction for the
