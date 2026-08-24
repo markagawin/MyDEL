@@ -5,6 +5,7 @@ import { Transaction } from '../types';
 import { CategoryMeta, UNKNOWN_CATEGORY } from '../categories';
 import { formatPeso, formatPesoCompact } from '../currency';
 import { formatFullDate, formatTimeOfDay, sameDay, toIsoDateOnly } from '../cycleEngine';
+import { isSavingsTransaction, savingsActionOf } from '../savings';
 import { AppTheme, useTheme } from '../theme';
 
 interface Props {
@@ -33,9 +34,13 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  // Savings deposits/withdrawals aren't spending, so they're excluded from every total
+  // here — the day cells, the month total, and the day-detail total — even though the
+  // entry itself still shows up in that day's transaction list below.
   const totalsByDay = useMemo(() => {
     const map = new Map<string, number>();
     for (const tx of transactions) {
+      if (isSavingsTransaction(tx)) continue;
       const key = toIsoDateOnly(new Date(tx.timestamp));
       map.set(key, (map.get(key) ?? 0) + tx.amount);
     }
@@ -82,7 +87,10 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
   }, [transactions, selectedDate]);
 
   const selectedDayTotal = useMemo(
-    () => selectedDayTransactions.reduce((sum, t) => sum + t.amount, 0),
+    () =>
+      selectedDayTransactions
+        .filter((t) => !isSavingsTransaction(t))
+        .reduce((sum, t) => sum + t.amount, 0),
     [selectedDayTransactions]
   );
 
@@ -178,13 +186,18 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
               ) : (
                 selectedDayTransactions.map((tx) => {
                   const meta = categoryMap[tx.category] ?? UNKNOWN_CATEGORY;
+                  const isSavings = isSavingsTransaction(tx);
+                  const isWithdrawal = isSavings && savingsActionOf(tx) === 'withdrawal';
                   return (
                     <View key={tx.id} style={styles.dayDetailRow}>
                       <View style={[styles.dayDetailBadge, { backgroundColor: meta.color }]}>
                         <Text style={styles.dayDetailBadgeIcon}>{meta.icon}</Text>
                       </View>
                       <View style={styles.dayDetailMiddle}>
-                        <Text style={styles.dayDetailCategory}>{meta.label}</Text>
+                        <Text style={styles.dayDetailCategory}>
+                          {meta.label}
+                          {isSavings ? ` — ${isWithdrawal ? 'Withdrawal' : 'Deposit'}` : ''}
+                        </Text>
                         {tx.note ? (
                           <Text style={styles.dayDetailNote} numberOfLines={1}>
                             {tx.note}
@@ -194,7 +207,11 @@ export default function CalendarSummaryModal({ visible, transactions, categoryMa
                           {formatTimeOfDay(new Date(tx.timestamp))}
                         </Text>
                       </View>
-                      <Text style={styles.dayDetailAmount}>{formatPeso(tx.amount)}</Text>
+                      <Text
+                        style={[styles.dayDetailAmount, isWithdrawal && styles.dayDetailAmountWithdrawal]}
+                      >
+                        {formatPeso(tx.amount)}
+                      </Text>
                     </View>
                   );
                 })
@@ -331,6 +348,7 @@ const createStyles = (theme: AppTheme) =>
     dayDetailNote: { fontSize: 12, color: theme.textMuted, marginTop: 1 },
     dayDetailTime: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
     dayDetailAmount: { fontSize: 14, fontWeight: '700', color: theme.text },
+    dayDetailAmountWithdrawal: { color: theme.success },
     summaryCard: {
       backgroundColor: theme.card,
       borderRadius: 14,
