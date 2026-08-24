@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
 import { formatPeso } from '../currency';
@@ -14,6 +15,7 @@ import CalendarSummaryModal from '../components/CalendarSummaryModal';
 import { CategoryKey, Transaction } from '../types';
 
 export default function SummaryScreen() {
+  const navigation = useNavigation<any>();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { transactions, currentCycleIdentifier, currentCycleRange, categories, categoryMap } =
@@ -97,15 +99,24 @@ export default function SummaryScreen() {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.headerTitle}>Summary</Text>
-          <TouchableOpacity
-            accessibilityLabel="Calendar view"
-            style={styles.calendarButton}
-            onPress={() => setCalendarVisible(true)}
-          >
-            <View style={styles.calendarIcon}>
-              <View style={styles.calendarIconHeader} />
-            </View>
-          </TouchableOpacity>
+          <View style={styles.headerButtonRow}>
+            <TouchableOpacity
+              accessibilityLabel="Calendar view"
+              style={styles.calendarButton}
+              onPress={() => setCalendarVisible(true)}
+            >
+              <View style={styles.calendarIcon}>
+                <View style={styles.calendarIconHeader} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel="Settings"
+              style={styles.calendarButton}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <Text style={styles.gearIcon}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <ViewModeToggle
           mode={viewMode}
@@ -273,6 +284,8 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: 10,
   },
   headerTitle: { fontSize: 24, fontWeight: '800', color: theme.navy },
+  headerButtonRow: { flexDirection: 'row', gap: 10 },
+  gearIcon: { fontSize: 18 },
   calendarButton: {
     width: 40,
     height: 40,

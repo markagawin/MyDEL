@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
 import { CategoryKey } from '../types';
@@ -25,7 +24,6 @@ import Toast from '../components/Toast';
 import { noWebOutline } from '../webInputStyle';
 
 export default function QuickLogScreen() {
-  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -141,11 +139,7 @@ export default function QuickLogScreen() {
               <Text style={styles.appName}>MyDEL</Text>
               <Text style={styles.appSubtitle}>My Daily Expenses in Life</Text>
             </View>
-            <TouchableOpacity
-              accessibilityLabel="Settings"
-              style={styles.profileCluster}
-              onPress={() => navigation.navigate('Settings')}
-            >
+            <View style={styles.profileCluster}>
               {profileName ? (
                 <Text style={styles.profileName} numberOfLines={1}>
                   {profileName}
@@ -160,10 +154,7 @@ export default function QuickLogScreen() {
                   </Text>
                 )}
               </View>
-              <View style={styles.gearButton}>
-                <Text style={styles.gearIcon}>⚙️</Text>
-              </View>
-            </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.banner}>
@@ -344,17 +335,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   avatarImage: { width: 36, height: 36, borderRadius: 18 },
   avatarInitial: { fontSize: 15, fontWeight: '700', color: theme.navy },
-  gearButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  gearIcon: { fontSize: 18 },
   fieldLabel: {
     fontSize: 11,
     fontWeight: '700',
