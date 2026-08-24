@@ -16,7 +16,6 @@ import { BUILT_IN_CATEGORY_KEYS, CategoryMeta, UNKNOWN_CATEGORY } from '../categ
 import { CycleMode, RecurringEntry } from '../types';
 import { formatFullDate, parseIsoDateOnly, toIsoDateOnly } from '../cycleEngine';
 import { formatPeso } from '../currency';
-import { digitsFromDate, formatDateMask, parseMaskedDate } from '../dateInputMask';
 import { pickProfilePhoto } from '../imagePicker';
 import CustomRangeBar from '../components/CustomRangeBar';
 import AddCategoryModal from '../components/AddCategoryModal';
@@ -114,10 +113,7 @@ export default function SettingsScreen() {
     setProfileName,
     setProfilePhotoUri,
   } = useAppData();
-  const [customDateText, setCustomDateText] = useState(() =>
-    formatDateMask(digitsFromDate(parseIsoDateOnly(settings.customAnchorDate)))
-  );
-  const [dateError, setDateError] = useState(false);
+  const [customDateModalVisible, setCustomDateModalVisible] = useState(false);
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<CategoryMeta | null>(null);
   const [addRecurringVisible, setAddRecurringVisible] = useState(false);
@@ -185,22 +181,12 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleCustomDateChange = (value: string) => {
-    setCustomDateText(formatDateMask(value));
-    setDateError(false);
-  };
-
-  const commitCustomDate = () => {
-    const parsed = parseMaskedDate(customDateText);
-    if (!parsed) {
-      setDateError(true);
-      return;
-    }
+  const handlePickCustomDate = (date: Date) => {
     updateSettings({
       ...settings,
       mode: 'custom',
-      customDay: clampDay(parsed.getDate()),
-      customAnchorDate: toIsoDateOnly(parsed),
+      customDay: clampDay(date.getDate()),
+      customAnchorDate: toIsoDateOnly(date),
     });
   };
 
@@ -283,24 +269,17 @@ export default function SettingsScreen() {
               {opt.mode === 'custom' && active && (
                 <View style={styles.customBlock}>
                   <Text style={styles.customLabel}>Anchor date</Text>
-                  <TextInput
-                    style={[styles.customInput, dateError && styles.customInputError, noWebOutline]}
-                    value={customDateText}
-                    onChangeText={handleCustomDateChange}
-                    onBlur={commitCustomDate}
-                    onSubmitEditing={commitCustomDate}
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    placeholder="MM/DD/YYYY"
-                    placeholderTextColor={theme.textMuted}
-                  />
-                  {dateError ? (
-                    <Text style={styles.errorText}>Enter a valid date (MM/DD/YYYY)</Text>
-                  ) : (
-                    <Text style={styles.customHint}>
-                      Resets on the {ordinal(settings.customDay)} of every month.
+                  <TouchableOpacity
+                    style={styles.customInput}
+                    onPress={() => setCustomDateModalVisible(true)}
+                  >
+                    <Text style={styles.customInputText}>
+                      {formatFullDate(parseIsoDateOnly(settings.customAnchorDate))}
                     </Text>
-                  )}
+                  </TouchableOpacity>
+                  <Text style={styles.customHint}>
+                    Resets on the {ordinal(settings.customDay)} of every month.
+                  </Text>
                 </View>
               )}
 
@@ -519,6 +498,13 @@ export default function SettingsScreen() {
         onChange={handleAddPayoutDate}
         onClose={() => setAddPayoutDateVisible(false)}
       />
+
+      <DatePickerModal
+        visible={customDateModalVisible}
+        value={parseIsoDateOnly(settings.customAnchorDate)}
+        onChange={handlePickCustomDate}
+        onClose={() => setCustomDateModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -619,16 +605,17 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    width: 150,
+    alignItems: 'center',
+    backgroundColor: theme.background,
+  },
+  customInputText: {
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 1,
-    width: 150,
-    textAlign: 'center',
     color: theme.text,
   },
-  customInputError: { borderColor: theme.danger },
   customHint: { fontSize: 12, color: theme.textMuted, marginTop: 8 },
-  errorText: { fontSize: 12, color: theme.danger, marginTop: 8 },
   payoutDateList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   payoutDateChip: {
     flexDirection: 'row',
