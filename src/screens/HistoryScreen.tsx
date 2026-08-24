@@ -7,6 +7,7 @@ import { UNKNOWN_CATEGORY } from '../categories';
 import { formatPeso } from '../currency';
 import { endOfDay, formatFullDate, formatTimeOfDay, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
+import { isSavingsTransaction, savingsActionOf } from '../savings';
 import { Transaction } from '../types';
 import { AppTheme, useTheme } from '../theme';
 import CyclePickerModal from '../components/CyclePickerModal';
@@ -125,6 +126,8 @@ export default function HistoryScreen() {
           )}
           renderItem={({ item }) => {
             const meta = categoryMap[item.category] ?? UNKNOWN_CATEGORY;
+            const isSavings = isSavingsTransaction(item);
+            const isWithdrawal = isSavings && savingsActionOf(item) === 'withdrawal';
             return (
               <Swipeable
                 renderRightActions={() => (
@@ -145,11 +148,16 @@ export default function HistoryScreen() {
                     <Text style={styles.badgeIcon}>{meta.icon}</Text>
                   </View>
                   <View style={styles.rowMiddle}>
-                    <Text style={styles.rowCategory}>{meta.label}</Text>
+                    <Text style={styles.rowCategory}>
+                      {meta.label}
+                      {isSavings ? ` — ${isWithdrawal ? 'Withdrawal' : 'Deposit'}` : ''}
+                    </Text>
                     {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
                     <Text style={styles.rowTime}>{formatTimeOfDay(new Date(item.timestamp))}</Text>
                   </View>
-                  <Text style={styles.rowAmount}>{formatPeso(item.amount)}</Text>
+                  <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
+                    {formatPeso(item.amount)}
+                  </Text>
                   <TouchableOpacity
                     accessibilityLabel="Delete entry"
                     style={styles.rowDeleteButton}
@@ -253,6 +261,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   rowNote: { fontSize: 12.5, color: theme.textMuted, marginTop: 2 },
   rowTime: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
   rowAmount: { fontSize: 15, fontWeight: '700', color: theme.text },
+  rowAmountWithdrawal: { color: theme.success },
   rowDeleteButton: {
     marginLeft: 10,
     padding: 6,

@@ -15,9 +15,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
-import { CategoryKey } from '../types';
+import { CategoryKey, SavingsAction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, sameDay } from '../cycleEngine';
+import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
 import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
@@ -45,6 +46,7 @@ export default function QuickLogScreen() {
   } = useAppData();
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
+  const [savingsAction, setSavingsAction] = useState<SavingsAction>('deposit');
   const [note, setNote] = useState('');
   const [entryDate, setEntryDate] = useState(() => new Date());
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
@@ -84,9 +86,20 @@ export default function QuickLogScreen() {
 
   const cycleLabel = currentCycleRange.label;
 
+  // Net outflow for the current period: a savings deposit counts like any expense (money no
+  // longer available), but a withdrawal gives money back, so it's subtracted rather than added.
+  // This is what "Remaining of paycheck" and the progress bar are based on.
   const periodTotal = useMemo(() => {
     return transactions
       .filter((t) => t.cycleIdentifier === currentCycleIdentifier)
+      .reduce((sum, t) => sum + (isSavingsTransaction(t) ? savingsSignedAmount(t) : t.amount), 0);
+  }, [transactions, currentCycleIdentifier]);
+
+  // "Total spent so far" excludes savings entirely — putting money into or taking it out of
+  // savings isn't spending.
+  const periodSpentTotal = useMemo(() => {
+    return transactions
+      .filter((t) => t.cycleIdentifier === currentCycleIdentifier && !isSavingsTransaction(t))
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions, currentCycleIdentifier]);
 
@@ -104,6 +117,8 @@ export default function QuickLogScreen() {
     const loggedAmount = amountValue;
     const loggedCategory = category;
     const loggedNote = note;
+    const loggedSavingsAction = savingsAction;
+    const isSavings = loggedCategory === SAVINGS_CATEGORY_KEY;
 
     const now = new Date();
     const timestamp = new Date(
@@ -120,6 +135,7 @@ export default function QuickLogScreen() {
     setNote('');
     setAmountBlurred(false);
     setEntryDate(new Date());
+    setSavingsAction('deposit');
     amountInputRef.current?.blur();
 
     const newId = addTransaction({
@@ -127,10 +143,17 @@ export default function QuickLogScreen() {
       category: loggedCategory,
       note: loggedNote,
       timestamp,
+      savingsAction: isSavings ? loggedSavingsAction : undefined,
     });
 
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToastMessage(`${formatPeso(loggedAmount)} added successfully`);
+    setToastMessage(
+      isSavings
+        ? loggedSavingsAction === 'withdrawal'
+          ? `${formatPeso(loggedAmount)} withdrawn from savings`
+          : `${formatPeso(loggedAmount)} deposited to savings`
+        : `${formatPeso(loggedAmount)} added successfully`
+    );
     setToastUndoId(newId);
     setToastVisible(true);
     toastTimeoutRef.current = setTimeout(() => {
@@ -219,7 +242,7 @@ export default function QuickLogScreen() {
               </>
             ) : (
               <>
-                <Text style={styles.bannerTotal}>{formatPeso(periodTotal)}</Text>
+                <Text style={styles.bannerTotal}>{formatPeso(periodSpentTotal)}</Text>
                 <Text style={styles.bannerSub}>Total spent so far</Text>
               </>
             )}
@@ -263,7 +286,10 @@ export default function QuickLogScreen() {
               return (
                 <Pressable
                   key={cat.key}
-                  onPress={() => setCategory(selected ? null : cat.key)}
+                  onPress={() => {
+                    setCategory(selected ? null : cat.key);
+                    setSavingsAction('deposit');
+                  }}
                   style={[
                     styles.tile,
                     selected && { backgroundColor: cat.color, borderColor: cat.color },
@@ -284,6 +310,43 @@ export default function QuickLogScreen() {
               <Text style={styles.addTileLabel}>Add</Text>
             </Pressable>
           </View>
+
+          {category === SAVINGS_CATEGORY_KEY && (
+            <View style={styles.savingsToggleRow}>
+              <TouchableOpacity
+                style={[
+                  styles.savingsToggleOption,
+                  savingsAction === 'deposit' && styles.savingsToggleOptionActive,
+                ]}
+                onPress={() => setSavingsAction('deposit')}
+              >
+                <Text
+                  style={[
+                    styles.savingsToggleText,
+                    savingsAction === 'deposit' && styles.savingsToggleTextActive,
+                  ]}
+                >
+                  Deposit
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.savingsToggleOption,
+                  savingsAction === 'withdrawal' && styles.savingsToggleOptionActive,
+                ]}
+                onPress={() => setSavingsAction('withdrawal')}
+              >
+                <Text
+                  style={[
+                    styles.savingsToggleText,
+                    savingsAction === 'withdrawal' && styles.savingsToggleTextActive,
+                  ]}
+                >
+                  Withdrawal
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <Text style={styles.fieldLabelMuted}>NOTE (OPTIONAL)</Text>
           <View style={styles.noteWrap}>
@@ -487,6 +550,22 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   addTileIcon: { fontSize: 22, fontWeight: '700', color: theme.textMuted, marginBottom: 2 },
   addTileLabel: { fontSize: 10.5, fontWeight: '600', color: theme.textMuted },
+  savingsToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: theme.surfaceMuted,
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 16,
+  },
+  savingsToggleOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 9,
+    alignItems: 'center',
+  },
+  savingsToggleOptionActive: { backgroundColor: theme.navy },
+  savingsToggleText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
+  savingsToggleTextActive: { color: '#FFFFFF' },
   noteWrap: {
     flexDirection: 'row',
     alignItems: 'center',

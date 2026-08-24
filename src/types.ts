@@ -7,6 +7,8 @@ export interface CustomCategory {
   color: string;
 }
 
+export type SavingsAction = 'deposit' | 'withdrawal';
+
 export interface Transaction {
   id: string;
   amount: number;
@@ -15,6 +17,7 @@ export interface Transaction {
   timestamp: string; // ISO string
   cycleIdentifier: string;
   recurringSourceId?: string; // set when auto-logged from a RecurringEntry
+  savingsAction?: SavingsAction; // only meaningful when category === 'savings'; undefined on older entries means 'deposit'
 }
 
 export interface RecurringEntry {

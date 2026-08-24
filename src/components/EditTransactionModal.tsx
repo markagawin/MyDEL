@@ -10,8 +10,9 @@ import {
   View,
 } from 'react-native';
 import { CategoryMeta } from '../categories';
-import { CategoryKey, Transaction } from '../types';
+import { CategoryKey, SavingsAction, Transaction } from '../types';
 import { formatFullDate, sameDay } from '../cycleEngine';
+import { SAVINGS_CATEGORY_KEY } from '../savings';
 import { AppTheme, useTheme } from '../theme';
 import { noWebOutline } from '../webInputStyle';
 import DatePickerModal from './DatePickerModal';
@@ -21,7 +22,13 @@ interface Props {
   categories: CategoryMeta[];
   onSave: (
     id: string,
-    input: { amount: number; category: CategoryKey; note?: string; timestamp: Date }
+    input: {
+      amount: number;
+      category: CategoryKey;
+      note?: string;
+      timestamp: Date;
+      savingsAction?: SavingsAction;
+    }
   ) => void;
   onClose: () => void;
 }
@@ -31,6 +38,7 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
+  const [savingsAction, setSavingsAction] = useState<SavingsAction>('deposit');
   const [note, setNote] = useState('');
   const [entryDate, setEntryDate] = useState(() => new Date());
   const [datePickerVisible, setDatePickerVisible] = useState(false);
@@ -39,6 +47,7 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
     if (transaction) {
       setAmountText(String(transaction.amount));
       setCategory(transaction.category);
+      setSavingsAction(transaction.savingsAction ?? 'deposit');
       setNote(transaction.note ?? '');
       setEntryDate(new Date(transaction.timestamp));
     }
@@ -59,7 +68,13 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
       original.getSeconds(),
       original.getMilliseconds()
     );
-    onSave(transaction.id, { amount: amountValue, category, note: note.trim() || undefined, timestamp });
+    onSave(transaction.id, {
+      amount: amountValue,
+      category,
+      note: note.trim() || undefined,
+      timestamp,
+      savingsAction: category === SAVINGS_CATEGORY_KEY ? savingsAction : undefined,
+    });
     onClose();
   };
 
@@ -92,7 +107,10 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
                 return (
                   <TouchableOpacity
                     key={cat.key}
-                    onPress={() => setCategory(cat.key)}
+                    onPress={() => {
+                      setCategory(cat.key);
+                      setSavingsAction('deposit');
+                    }}
                     style={[
                       styles.tile,
                       selected && { backgroundColor: cat.color, borderColor: cat.color },
@@ -109,6 +127,43 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
                 );
               })}
             </View>
+
+            {category === SAVINGS_CATEGORY_KEY && (
+              <View style={styles.savingsToggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.savingsToggleOption,
+                    savingsAction === 'deposit' && styles.savingsToggleOptionActive,
+                  ]}
+                  onPress={() => setSavingsAction('deposit')}
+                >
+                  <Text
+                    style={[
+                      styles.savingsToggleText,
+                      savingsAction === 'deposit' && styles.savingsToggleTextActive,
+                    ]}
+                  >
+                    Deposit
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.savingsToggleOption,
+                    savingsAction === 'withdrawal' && styles.savingsToggleOptionActive,
+                  ]}
+                  onPress={() => setSavingsAction('withdrawal')}
+                >
+                  <Text
+                    style={[
+                      styles.savingsToggleText,
+                      savingsAction === 'withdrawal' && styles.savingsToggleTextActive,
+                    ]}
+                  >
+                    Withdrawal
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <Text style={styles.fieldLabel}>NOTE (OPTIONAL)</Text>
             <TextInput
@@ -213,6 +268,22 @@ const createStyles = (theme: AppTheme) =>
     tileIcon: { fontSize: 20, marginBottom: 2 },
     tileLabel: { fontSize: 9.5, fontWeight: '600', color: theme.text, textAlign: 'center' },
     tileLabelSelected: { color: '#FFFFFF' },
+    savingsToggleRow: {
+      flexDirection: 'row',
+      backgroundColor: theme.background,
+      borderRadius: 12,
+      padding: 3,
+      marginBottom: 14,
+    },
+    savingsToggleOption: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 9,
+      alignItems: 'center',
+    },
+    savingsToggleOptionActive: { backgroundColor: theme.navy },
+    savingsToggleText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
+    savingsToggleTextActive: { color: '#FFFFFF' },
     noteInput: {
       backgroundColor: theme.background,
       borderRadius: 12,

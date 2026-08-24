@@ -12,19 +12,28 @@ import CyclePickerModal from '../components/CyclePickerModal';
 import CustomRangeBar from '../components/CustomRangeBar';
 import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
 import CalendarSummaryModal from '../components/CalendarSummaryModal';
+import SavingsSummaryModal from '../components/SavingsSummaryModal';
+import { isSavingsTransaction } from '../savings';
 import { CategoryKey, Transaction } from '../types';
 
 export default function SummaryScreen() {
   const navigation = useNavigation<any>();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { transactions, currentCycleIdentifier, currentCycleRange, categories, categoryMap } =
-    useAppData();
+  const {
+    transactions,
+    currentCycleIdentifier,
+    currentCycleRange,
+    categories,
+    categoryMap,
+    totalSaved,
+  } = useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('cycle');
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [savingsVisible, setSavingsVisible] = useState(false);
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
 
@@ -62,7 +71,7 @@ export default function SummaryScreen() {
   const breakdown = useMemo(() => {
     const totals = new Map<CategoryKey, number>();
     for (const tx of transactions) {
-      if (!inRange(tx)) continue;
+      if (!inRange(tx) || isSavingsTransaction(tx)) continue;
       totals.set(tx.category, (totals.get(tx.category) ?? 0) + tx.amount);
     }
     const total = Array.from(totals.values()).reduce((s, v) => s + v, 0);
@@ -144,6 +153,14 @@ export default function SummaryScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        <TouchableOpacity style={styles.savingsCard} onPress={() => setSavingsVisible(true)}>
+          <View>
+            <Text style={styles.savingsLabel}>💰 Total Saved</Text>
+            <Text style={styles.savingsHint}>Deposits and withdrawals, all time</Text>
+          </View>
+          <Text style={styles.savingsValue}>{formatPeso(totalSaved)}</Text>
+        </TouchableOpacity>
+
         {highest ? (
           <View style={styles.highlightCard}>
             <Text style={styles.highlightLabel}>Highest Spend</Text>
@@ -270,6 +287,12 @@ export default function SummaryScreen() {
         categoryMap={categoryMap}
         onClose={() => setCalendarVisible(false)}
       />
+
+      <SavingsSummaryModal
+        visible={savingsVisible}
+        transactions={transactions}
+        onClose={() => setSavingsVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -318,6 +341,20 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   filterText: { fontSize: 13, fontWeight: '600', color: theme.text, marginRight: 6 },
   filterChevron: { fontSize: 12, color: theme.textMuted },
+  savingsCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  savingsLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
+  savingsHint: { fontSize: 11.5, color: theme.textMuted, marginTop: 2 },
+  savingsValue: { fontSize: 18, fontWeight: '800', color: theme.navy },
   highlightCard: {
     backgroundColor: theme.navy,
     borderRadius: 16,
