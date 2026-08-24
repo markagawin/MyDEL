@@ -17,19 +17,27 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 
     <style id="expo-reset">
-      /* These styles make the body full-height */
+      /* These styles make the body full-height. iOS Safari (especially in standalone
+         PWA mode) can compute 100% height short of the real viewport, leaving a gap
+         at the bottom safe area that shows the browser's default white paint instead
+         of the app — -webkit-fill-available covers that shortfall. */
       html,
       body {
         height: 100%;
+        height: -webkit-fill-available;
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
       }
       /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
         flex: 1;
       }
     </style>

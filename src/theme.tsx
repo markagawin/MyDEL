@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import { loadThemePreference, saveThemePreference } from './storage';
 
 const lightColors = {
@@ -68,6 +68,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isDark = preference === 'system' ? systemScheme === 'dark' : preference === 'dark';
+
+  // On web, html/body have no theme awareness of their own. If iOS Safari's viewport
+  // height calculation ever falls short of the real screen (see index.html), this
+  // keeps that sliver matching the current theme instead of showing stark white.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const bg = isDark ? darkColors.background : lightColors.background;
+    document.documentElement.style.backgroundColor = bg;
+    document.body.style.backgroundColor = bg;
+  }, [isDark]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
