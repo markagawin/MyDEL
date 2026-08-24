@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
 import { CategoryKey, SavingsAction } from '../types';
 import { formatPeso } from '../currency';
@@ -28,7 +28,6 @@ import { noWebOutline } from '../webInputStyle';
 
 export default function QuickLogScreen() {
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const {
@@ -371,7 +370,7 @@ export default function QuickLogScreen() {
 
         </ScrollView>
 
-        <View style={[styles.floatingFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
+        <View style={styles.floatingFooter}>
           <TouchableOpacity
             style={[styles.logButton, !canLog && styles.logButtonDisabled]}
             disabled={!canLog}
@@ -596,6 +595,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   floatingFooter: {
     paddingHorizontal: 20,
     paddingTop: 12,
+    paddingBottom: 16,
     backgroundColor: theme.background,
     borderTopWidth: 1,
     borderTopColor: theme.border,
