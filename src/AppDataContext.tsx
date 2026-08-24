@@ -83,6 +83,7 @@ interface AppDataContextValue {
   updateSettings: (settings: CycleSettings) => Promise<void>;
   setCurrentPaycheck: (amount: number | null) => Promise<void>;
   addCategory: (input: { label: string; icon: string; color: string }) => Promise<void>;
+  updateCategory: (key: string, input: { label: string; icon: string; color: string }) => Promise<void>;
   removeCategory: (key: string) => Promise<void>;
   addRecurringEntry: (input: { amount: number; category: CategoryKey; note?: string }) => Promise<void>;
   removeRecurringEntry: (id: string) => Promise<void>;
@@ -362,6 +363,22 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const updateCategory = useCallback(
+    async (key: string, input: { label: string; icon: string; color: string }) => {
+      const label = input.label.trim();
+      if (!label) return;
+      setCustomCategories((prev) => {
+        // The key stays fixed so existing transactions logged under it keep resolving correctly.
+        const next = prev.map((c) =>
+          c.key === key ? { ...c, label, icon: input.icon, color: input.color } : c
+        );
+        saveCustomCategories(next);
+        return next;
+      });
+    },
+    []
+  );
+
   const addRecurringEntry = useCallback(
     async (input: { amount: number; category: CategoryKey; note?: string }) => {
       const entry: RecurringEntry = {
@@ -475,6 +492,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     updateSettings,
     setCurrentPaycheck,
     addCategory,
+    updateCategory,
     removeCategory,
     addRecurringEntry,
     removeRecurringEntry,

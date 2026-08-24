@@ -102,6 +102,7 @@ export default function SettingsScreen() {
     categories,
     categoryMap,
     addCategory,
+    updateCategory,
     removeCategory,
     recurringEntries,
     addRecurringEntry,
@@ -115,6 +116,7 @@ export default function SettingsScreen() {
   } = useAppData();
   const [customDateModalVisible, setCustomDateModalVisible] = useState(false);
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryMeta | null>(null);
   const [pendingRemove, setPendingRemove] = useState<CategoryMeta | null>(null);
   const [addRecurringVisible, setAddRecurringVisible] = useState(false);
   const [pendingRemoveRecurring, setPendingRemoveRecurring] = useState<RecurringEntry | null>(null);
@@ -343,14 +345,15 @@ export default function SettingsScreen() {
 
         <Text style={[styles.title, styles.sectionSpacing]}>Categories</Text>
         <Text style={styles.subtitle}>
-          The 8 built-in categories can't be removed. Add your own for anything else.
+          The 8 built-in categories can't be removed. Tap a custom category to edit it, or add
+          your own for anything else.
         </Text>
 
         <View style={styles.categoryList}>
           {categories.map((cat) => {
             const isBuiltIn = BUILT_IN_CATEGORY_KEYS.has(cat.key);
-            return (
-              <View key={cat.key} style={styles.categoryRow}>
+            const row = (
+              <>
                 <View style={[styles.categoryBadge, { backgroundColor: cat.color }]}>
                   <Text style={styles.categoryBadgeIcon}>{cat.icon}</Text>
                 </View>
@@ -366,7 +369,20 @@ export default function SettingsScreen() {
                     <Text style={styles.categoryRemoveIcon}>🗑️</Text>
                   </TouchableOpacity>
                 )}
+              </>
+            );
+            return isBuiltIn ? (
+              <View key={cat.key} style={styles.categoryRow}>
+                {row}
               </View>
+            ) : (
+              <TouchableOpacity
+                key={cat.key}
+                style={styles.categoryRow}
+                onPress={() => setEditingCategory(cat)}
+              >
+                {row}
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -439,10 +455,20 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <AddCategoryModal
-        visible={addCategoryVisible}
+        visible={addCategoryVisible || editingCategory !== null}
         categoryCount={categories.length}
-        onSave={addCategory}
-        onClose={() => setAddCategoryVisible(false)}
+        editingCategory={editingCategory}
+        onSave={(input) => {
+          if (editingCategory) {
+            updateCategory(editingCategory.key, input);
+          } else {
+            addCategory(input);
+          }
+        }}
+        onClose={() => {
+          setAddCategoryVisible(false);
+          setEditingCategory(null);
+        }}
       />
 
       <ConfirmModal

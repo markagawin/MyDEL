@@ -38,10 +38,12 @@ export const UNKNOWN_CATEGORY: CategoryMeta = {
 export const CATEGORY_ICON_CHOICES = [
   '🏠', '🚗', '🎮', '🐾', '💊', '👶', '🎓', '✈️', '🎁', '📱',
   '🎉', '🧾', '☕', '🍿', '👕', '🧴', '🔧', '📚', '🎵', '⚕️',
+  '🎬', '💼', '🏋️', '🌐',
 ];
 
 export const CATEGORY_COLOR_CHOICES = [
   '#F97316', '#3B82F6', '#8B5CF6', '#EF4444', '#F59E0B',
   '#EC4899', '#10B981', '#6B7280', '#0EA5E9', '#84CC16',
   '#D946EF', '#14B8A6',
+  '#6366F1', '#F43F5E', '#06B6D4', '#EAB308',
 ];

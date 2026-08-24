@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { CategoryMeta } from '../categories';
 import { CATEGORY_COLOR_CHOICES, CATEGORY_ICON_CHOICES } from '../categories';
 import { AppTheme, useTheme } from '../theme';
 import { noWebOutline } from '../webInputStyle';
@@ -16,26 +17,34 @@ import { noWebOutline } from '../webInputStyle';
 interface Props {
   visible: boolean;
   categoryCount: number;
+  editingCategory?: CategoryMeta | null;
   onSave: (input: { label: string; icon: string; color: string }) => void;
   onClose: () => void;
 }
 
 const SOFT_CAP = 12;
 
-export default function AddCategoryModal({ visible, categoryCount, onSave, onClose }: Props) {
+export default function AddCategoryModal({
+  visible,
+  categoryCount,
+  editingCategory,
+  onSave,
+  onClose,
+}: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isEditing = !!editingCategory;
   const [label, setLabel] = useState('');
   const [icon, setIcon] = useState(CATEGORY_ICON_CHOICES[0]);
   const [color, setColor] = useState(CATEGORY_COLOR_CHOICES[0]);
 
   useEffect(() => {
     if (visible) {
-      setLabel('');
-      setIcon(CATEGORY_ICON_CHOICES[0]);
-      setColor(CATEGORY_COLOR_CHOICES[0]);
+      setLabel(editingCategory?.label ?? '');
+      setIcon(editingCategory?.icon ?? CATEGORY_ICON_CHOICES[0]);
+      setColor(editingCategory?.color ?? CATEGORY_COLOR_CHOICES[0]);
     }
-  }, [visible]);
+  }, [visible, editingCategory]);
 
   const canSave = label.trim().length > 0;
 
@@ -50,9 +59,9 @@ export default function AddCategoryModal({ visible, categoryCount, onSave, onClo
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
           <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={styles.title}>New Category</Text>
+            <Text style={styles.title}>{isEditing ? 'Edit Category' : 'New Category'}</Text>
 
-            {categoryCount >= SOFT_CAP && (
+            {!isEditing && categoryCount >= SOFT_CAP && (
               <Text style={styles.softCapWarning}>
                 You have {categoryCount} categories already — Quick Log's grid reads best with
                 fewer than {SOFT_CAP}. You can still add more if you like.
@@ -117,7 +126,9 @@ export default function AddCategoryModal({ visible, categoryCount, onSave, onClo
                 disabled={!canSave}
                 onPress={handleSave}
               >
-                <Text style={styles.saveButtonText}>Add Category</Text>
+                <Text style={styles.saveButtonText}>
+                  {isEditing ? 'Save Changes' : 'Add Category'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
