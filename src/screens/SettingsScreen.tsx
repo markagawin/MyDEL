@@ -205,7 +205,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <Text style={styles.title}>Profile</Text>
         <Text style={styles.subtitle}>Set your name and photo, shown next to Settings.</Text>

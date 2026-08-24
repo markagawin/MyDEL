@@ -104,11 +104,10 @@ export default function DonutChart({
           paths.map(({ slice, startAngle, endAngle }) => {
             const isSelected = selectedKey === slice.key;
             const isDimmed = selectedKey !== null && !isSelected;
-            const sliceOuterR = isSelected ? outerR + 6 : outerR;
             return (
               <Path
                 key={slice.key}
-                d={donutSlicePath(cx, cy, sliceOuterR, innerR, startAngle, endAngle)}
+                d={donutSlicePath(cx, cy, outerR, innerR, startAngle, endAngle)}
                 fill={slice.color}
                 opacity={isDimmed ? 0.3 : 1}
                 onPress={() => onSelectKey(isSelected ? null : slice.key)}
