@@ -150,9 +150,16 @@ export default function QuickLogScreen() {
         onPanResponderRelease: (_, gesture) => {
           bannerTranslateX.flattenOffset();
           const width = bannerWidthRef.current || 1;
+          // Either a deliberate drag past ~12% of the banner's width, or a quick flick
+          // (high velocity) even over a short distance — matches how native swipers/
+          // page-dots behave, so a fast short flick isn't ignored just because it
+          // didn't travel far.
+          const passedDistance = Math.abs(gesture.dx) > width * 0.12;
+          const passedVelocity = Math.abs(gesture.vx) > 0.3;
           let target: 0 | 1 | 2 = bannerView;
-          if (Math.abs(gesture.dx) > width * 0.2) {
-            target = Math.max(0, Math.min(2, bannerView + (gesture.dx < 0 ? 1 : -1))) as 0 | 1 | 2;
+          if (passedDistance || passedVelocity) {
+            const direction = passedVelocity ? gesture.vx : gesture.dx;
+            target = Math.max(0, Math.min(2, bannerView + (direction < 0 ? 1 : -1))) as 0 | 1 | 2;
           }
           settleBannerTo(target);
           if (target !== bannerView) setBannerView(target);
