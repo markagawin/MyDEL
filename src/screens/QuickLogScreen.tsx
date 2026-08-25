@@ -51,7 +51,8 @@ export default function QuickLogScreen() {
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
   const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [showTotalOnly, setShowTotalOnly] = useState(false);
+  // 0 = Remaining of paycheck, 1 = Total spent this period, 2 = Total spent today.
+  const [bannerView, setBannerView] = useState<0 | 1 | 2>(0);
   const [amountBlurred, setAmountBlurred] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -66,7 +67,7 @@ export default function QuickLogScreen() {
   }, []);
 
   useEffect(() => {
-    setShowTotalOnly(false);
+    setBannerView(0);
   }, [currentCycleIdentifier]);
 
   const bannerPanResponder = useMemo(
@@ -76,7 +77,9 @@ export default function QuickLogScreen() {
           Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 10,
         onPanResponderRelease: (_, gesture) => {
           if (Math.abs(gesture.dx) > 40) {
-            setShowTotalOnly((prev) => !prev);
+            // Swipe left → next view, swipe right → previous, wrapping around.
+            const direction = gesture.dx < 0 ? 1 : -1;
+            setBannerView((prev) => ((prev + direction + 3) % 3) as 0 | 1 | 2);
           }
         },
       }),
@@ -101,6 +104,14 @@ export default function QuickLogScreen() {
       .filter((t) => t.cycleIdentifier === currentCycleIdentifier && !isSavingsTransaction(t))
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions, currentCycleIdentifier]);
+
+  // Live total for just today, regardless of which cycle it falls in — also excludes savings.
+  const todaySpentTotal = useMemo(() => {
+    const now = new Date();
+    return transactions
+      .filter((t) => !isSavingsTransaction(t) && sameDay(new Date(t.timestamp), now))
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [transactions]);
 
   const remaining = currentPaycheck !== null ? currentPaycheck - periodTotal : null;
   const pctSpent =
@@ -215,7 +226,7 @@ export default function QuickLogScreen() {
               </TouchableOpacity>
             </View>
 
-            {currentPaycheck !== null && remaining !== null && !showTotalOnly ? (
+            {currentPaycheck !== null && remaining !== null && bannerView === 0 ? (
               <>
                 <Text
                   style={[styles.bannerTotal, remaining < 0 && styles.bannerTotalDanger]}
@@ -239,6 +250,11 @@ export default function QuickLogScreen() {
                   />
                 </View>
               </>
+            ) : currentPaycheck !== null && bannerView === 2 ? (
+              <>
+                <Text style={styles.bannerTotal}>{formatPeso(todaySpentTotal)}</Text>
+                <Text style={styles.bannerSub}>Total spent today</Text>
+              </>
             ) : (
               <>
                 <Text style={styles.bannerTotal}>{formatPeso(periodSpentTotal)}</Text>
@@ -248,11 +264,14 @@ export default function QuickLogScreen() {
 
             {currentPaycheck !== null && (
               <View style={styles.bannerDots}>
-                <TouchableOpacity onPress={() => setShowTotalOnly(false)}>
-                  <View style={[styles.bannerDot, !showTotalOnly && styles.bannerDotActive]} />
+                <TouchableOpacity onPress={() => setBannerView(0)}>
+                  <View style={[styles.bannerDot, bannerView === 0 && styles.bannerDotActive]} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowTotalOnly(true)}>
-                  <View style={[styles.bannerDot, showTotalOnly && styles.bannerDotActive]} />
+                <TouchableOpacity onPress={() => setBannerView(1)}>
+                  <View style={[styles.bannerDot, bannerView === 1 && styles.bannerDotActive]} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setBannerView(2)}>
+                  <View style={[styles.bannerDot, bannerView === 2 && styles.bannerDotActive]} />
                 </TouchableOpacity>
               </View>
             )}
