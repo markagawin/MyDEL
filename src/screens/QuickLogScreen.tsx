@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Image,
   KeyboardAvoidingView,
   PanResponder,
@@ -19,6 +20,7 @@ import { CategoryKey, SavingsAction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
+import { loadBannerViewState, saveBannerViewState } from '../storage';
 import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
@@ -53,6 +55,7 @@ export default function QuickLogScreen() {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   // 0 = Remaining of paycheck, 1 = Total spent this period, 2 = Total spent today.
   const [bannerView, setBannerView] = useState<0 | 1 | 2>(0);
+  const [bannerWidth, setBannerWidthState] = useState(0);
   const [amountBlurred, setAmountBlurred] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -70,20 +73,96 @@ export default function QuickLogScreen() {
     setBannerView(0);
   }, [currentCycleIdentifier]);
 
+  // Restore whichever banner page was showing last time, but only within the same cycle —
+  // a new cycle should still start back on "Remaining of paycheck". Runs once on mount;
+  // deliberately not re-run when currentCycleIdentifier changes later, since the reset
+  // effect above already handles that case.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await loadBannerViewState();
+      if (
+        !cancelled &&
+        saved &&
+        saved.cycleIdentifier === currentCycleIdentifier &&
+        (saved.view === 0 || saved.view === 1 || saved.view === 2)
+      ) {
+        setBannerView(saved.view as 0 | 1 | 2);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    saveBannerViewState({ cycleIdentifier: currentCycleIdentifier, view: bannerView });
+  }, [bannerView, currentCycleIdentifier]);
+
+  const bannerWidthRef = useRef(0);
+  const setBannerWidth = (width: number) => {
+    bannerWidthRef.current = width;
+    setBannerWidthState(width);
+  };
+  const bannerTranslateX = useRef(new Animated.Value(0)).current;
+  const hasPositionedBannerRef = useRef(false);
+
+  // Slide smoothly to whichever page bannerView points at — for dot taps, swipe releases
+  // that land on a different page, and cycle resets. The very first positioning (on mount,
+  // once the banner's width is known) jumps instantly instead of animating in from page 0.
+  useEffect(() => {
+    if (bannerWidth === 0) return;
+    const toValue = -bannerView * bannerWidth;
+    if (!hasPositionedBannerRef.current) {
+      hasPositionedBannerRef.current = true;
+      bannerTranslateX.setValue(toValue);
+      return;
+    }
+    Animated.timing(bannerTranslateX, {
+      toValue,
+      duration: 260,
+      useNativeDriver: false,
+    }).start();
+  }, [bannerView, bannerWidth]);
+
+  const settleBannerTo = (target: 0 | 1 | 2) => {
+    Animated.timing(bannerTranslateX, {
+      toValue: -target * bannerWidthRef.current,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  };
+
   const bannerPanResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
           Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 10,
+        onPanResponderGrant: () => {
+          bannerTranslateX.stopAnimation();
+          bannerTranslateX.setOffset(-bannerView * bannerWidthRef.current);
+          bannerTranslateX.setValue(0);
+        },
+        onPanResponderMove: Animated.event([null, { dx: bannerTranslateX }], {
+          useNativeDriver: false,
+        }),
         onPanResponderRelease: (_, gesture) => {
-          if (Math.abs(gesture.dx) > 40) {
-            // Swipe left → next view, swipe right → previous, wrapping around.
-            const direction = gesture.dx < 0 ? 1 : -1;
-            setBannerView((prev) => ((prev + direction + 3) % 3) as 0 | 1 | 2);
+          bannerTranslateX.flattenOffset();
+          const width = bannerWidthRef.current || 1;
+          let target: 0 | 1 | 2 = bannerView;
+          if (Math.abs(gesture.dx) > width * 0.2) {
+            target = Math.max(0, Math.min(2, bannerView + (gesture.dx < 0 ? 1 : -1))) as 0 | 1 | 2;
           }
+          settleBannerTo(target);
+          if (target !== bannerView) setBannerView(target);
+        },
+        onPanResponderTerminate: () => {
+          bannerTranslateX.flattenOffset();
+          settleBannerTo(bannerView);
         },
       }),
-    []
+    [bannerView]
   );
 
   const cycleLabel = currentCycleRange.label;
@@ -216,7 +295,7 @@ export default function QuickLogScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.banner} {...(currentPaycheck !== null ? bannerPanResponder.panHandlers : {})}>
+          <View style={styles.banner}>
             <View style={styles.bannerTopRow}>
               <Text style={styles.bannerLabel}>Current Period: {cycleLabel}</Text>
               <TouchableOpacity onPress={() => setPaycheckModalVisible(true)}>
@@ -226,54 +305,72 @@ export default function QuickLogScreen() {
               </TouchableOpacity>
             </View>
 
-            {currentPaycheck !== null && remaining !== null && bannerView === 0 ? (
+            {currentPaycheck !== null && remaining !== null ? (
               <>
-                <Text
-                  style={[styles.bannerTotal, remaining < 0 && styles.bannerTotalDanger]}
+                <View
+                  style={styles.bannerCarouselClip}
+                  onLayout={(e) => setBannerWidth(e.nativeEvent.layout.width)}
+                  {...bannerPanResponder.panHandlers}
                 >
-                  {formatPeso(remaining)}
-                </Text>
-                <Text style={styles.bannerSub}>
-                  {remaining >= 0
-                    ? `Remaining of ${formatPeso(currentPaycheck)} paycheck`
-                    : `${formatPeso(Math.abs(remaining))} over your ${formatPeso(
-                        currentPaycheck
-                      )} paycheck`}
-                </Text>
-                <View style={styles.progressTrack}>
-                  <View
+                  <Animated.View
                     style={[
-                      styles.progressFill,
-                      { width: `${Math.min(100, pctSpent)}%` },
-                      pctSpent > 100 && styles.progressFillDanger,
+                      styles.bannerCarouselTrack,
+                      { width: bannerWidth * 3, transform: [{ translateX: bannerTranslateX }] },
                     ]}
-                  />
+                  >
+                    <View style={{ width: bannerWidth }}>
+                      <Text
+                        style={[styles.bannerTotal, remaining < 0 && styles.bannerTotalDanger]}
+                      >
+                        {formatPeso(remaining)}
+                      </Text>
+                      <Text style={styles.bannerSub}>
+                        {remaining >= 0
+                          ? `Remaining of ${formatPeso(currentPaycheck)} paycheck`
+                          : `${formatPeso(Math.abs(remaining))} over your ${formatPeso(
+                              currentPaycheck
+                            )} paycheck`}
+                      </Text>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${Math.min(100, pctSpent)}%` },
+                            pctSpent > 100 && styles.progressFillDanger,
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ width: bannerWidth }}>
+                      <Text style={styles.bannerTotal}>{formatPeso(periodSpentTotal)}</Text>
+                      <Text style={styles.bannerSub}>Total spent so far</Text>
+                    </View>
+
+                    <View style={{ width: bannerWidth }}>
+                      <Text style={styles.bannerTotal}>{formatPeso(todaySpentTotal)}</Text>
+                      <Text style={styles.bannerSub}>Total spent today</Text>
+                    </View>
+                  </Animated.View>
                 </View>
-              </>
-            ) : currentPaycheck !== null && bannerView === 2 ? (
-              <>
-                <Text style={styles.bannerTotal}>{formatPeso(todaySpentTotal)}</Text>
-                <Text style={styles.bannerSub}>Total spent today</Text>
+
+                <View style={styles.bannerDots}>
+                  <TouchableOpacity onPress={() => setBannerView(0)}>
+                    <View style={[styles.bannerDot, bannerView === 0 && styles.bannerDotActive]} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setBannerView(1)}>
+                    <View style={[styles.bannerDot, bannerView === 1 && styles.bannerDotActive]} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setBannerView(2)}>
+                    <View style={[styles.bannerDot, bannerView === 2 && styles.bannerDotActive]} />
+                  </TouchableOpacity>
+                </View>
               </>
             ) : (
               <>
                 <Text style={styles.bannerTotal}>{formatPeso(periodSpentTotal)}</Text>
                 <Text style={styles.bannerSub}>Total spent so far</Text>
               </>
-            )}
-
-            {currentPaycheck !== null && (
-              <View style={styles.bannerDots}>
-                <TouchableOpacity onPress={() => setBannerView(0)}>
-                  <View style={[styles.bannerDot, bannerView === 0 && styles.bannerDotActive]} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setBannerView(1)}>
-                  <View style={[styles.bannerDot, bannerView === 1 && styles.bannerDotActive]} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setBannerView(2)}>
-                  <View style={[styles.bannerDot, bannerView === 2 && styles.bannerDotActive]} />
-                </TouchableOpacity>
-              </View>
             )}
           </View>
 
@@ -480,6 +577,8 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   bannerLabel: { color: '#C9D6EE', fontSize: 13, fontWeight: '600' },
   paycheckLink: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+  bannerCarouselClip: { overflow: 'hidden', width: '100%' },
+  bannerCarouselTrack: { flexDirection: 'row' },
   bannerTotal: { color: '#FFFFFF', fontSize: 30, fontWeight: '800', marginTop: 6 },
   bannerTotalDanger: { color: '#FF9B9B' },
   bannerSub: { color: '#9FB2D6', fontSize: 12, marginTop: 2 },

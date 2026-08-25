@@ -10,6 +10,12 @@ const THEME_PREFERENCE_KEY = '@mydel/themePreference';
 const RECURRING_ENTRIES_KEY = '@mydel/recurringEntries';
 const PROFILE_NAME_KEY = '@mydel/profileName';
 const PROFILE_PHOTO_KEY = '@mydel/profilePhoto';
+const BANNER_VIEW_KEY = '@mydel/bannerView';
+
+export interface BannerViewState {
+  cycleIdentifier: string;
+  view: number;
+}
 
 export const DEFAULT_SETTINGS: CycleSettings = {
   mode: 'monthly',
@@ -124,4 +130,20 @@ export async function loadProfilePhoto(): Promise<string | null> {
 
 export async function saveProfilePhoto(uri: string): Promise<void> {
   await AsyncStorage.setItem(PROFILE_PHOTO_KEY, uri);
+}
+
+/** Which home-banner page was last showing, scoped to the cycle it was set in (so a new
+ * cycle starts back on "Remaining of paycheck" instead of restoring a stale page index). */
+export async function loadBannerViewState(): Promise<BannerViewState | null> {
+  const raw = await AsyncStorage.getItem(BANNER_VIEW_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as BannerViewState;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveBannerViewState(state: BannerViewState): Promise<void> {
+  await AsyncStorage.setItem(BANNER_VIEW_KEY, JSON.stringify(state));
 }
