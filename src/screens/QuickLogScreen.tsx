@@ -26,7 +26,7 @@ import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
 import DatePickerModal from '../components/DatePickerModal';
 import Toast from '../components/Toast';
-import { noWebOutline } from '../webInputStyle';
+import { noWebOutline, webPanYOnly } from '../webInputStyle';
 
 export default function QuickLogScreen() {
   const navigation = useNavigation<any>();
@@ -138,7 +138,10 @@ export default function QuickLogScreen() {
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 10,
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 5,
+        // Once we've decided this is a horizontal swipe, don't let the surrounding
+        // ScrollView take it back mid-drag just because of a little vertical wobble.
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           bannerTranslateX.stopAnimation();
           bannerTranslateX.setOffset(-bannerView * bannerWidthRef.current);
@@ -315,7 +318,7 @@ export default function QuickLogScreen() {
             {currentPaycheck !== null && remaining !== null ? (
               <>
                 <View
-                  style={styles.bannerCarouselClip}
+                  style={[styles.bannerCarouselClip, webPanYOnly]}
                   onLayout={(e) => setBannerWidth(e.nativeEvent.layout.width)}
                   {...bannerPanResponder.panHandlers}
                 >
