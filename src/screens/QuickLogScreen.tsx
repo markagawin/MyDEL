@@ -229,6 +229,17 @@ export default function QuickLogScreen() {
       : realCategories;
   }, [categories, creditGateActive]);
 
+  // The grid is 4 tiles per row with justifyContent: 'space-between', which spaces a
+  // *partial* last row differently depending on how many tiles are in it (1 tile sits at the
+  // left, 3 tiles spread edge-to-edge, etc.) — so the layout visibly jumps whenever the tile
+  // count changes, e.g. entering/leaving the credit card gate. Padding the count up to a
+  // multiple of 4 with invisible filler tiles gives space-between a full row to distribute
+  // every time, which keeps the real tiles consistently left-anchored regardless of count.
+  const gridFillerCount = useMemo(() => {
+    const totalTiles = visibleCategories.length + (creditGateActive ? 0 : 1); // +1 for Add tile
+    return (4 - (totalTiles % 4)) % 4;
+  }, [visibleCategories.length, creditGateActive]);
+
   const remaining = currentPaycheck !== null ? currentPaycheck - periodTotal : null;
   const pctSpent =
     currentPaycheck !== null && currentPaycheck > 0 ? (periodTotal / currentPaycheck) * 100 : 0;
@@ -493,6 +504,9 @@ export default function QuickLogScreen() {
                 <Text style={styles.addTileLabel}>Add</Text>
               </Pressable>
             )}
+            {Array.from({ length: gridFillerCount }).map((_, i) => (
+              <View key={`filler-${i}`} style={[styles.tile, styles.tileFiller]} />
+            ))}
           </View>
 
           {category === SAVINGS_CATEGORY_KEY && (
@@ -748,6 +762,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   addTileIcon: { fontSize: 22, fontWeight: '700', color: theme.textMuted, marginBottom: 2 },
   addTileLabel: { fontSize: 10.5, fontWeight: '600', color: theme.textMuted },
+  tileFiller: { backgroundColor: 'transparent', borderColor: 'transparent' },
   savingsToggleRow: {
     flexDirection: 'row',
     backgroundColor: theme.surfaceMuted,

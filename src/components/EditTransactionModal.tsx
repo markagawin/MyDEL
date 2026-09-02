@@ -70,6 +70,13 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
       : realCategories;
   }, [categories, creditGateActive]);
 
+  // Same reasoning as QuickLogScreen: pad to a multiple of 4 so a partial last row always
+  // gets the same space-between treatment, regardless of how many tiles are showing.
+  const gridFillerCount = useMemo(
+    () => (4 - (visibleCategories.length % 4)) % 4,
+    [visibleCategories.length]
+  );
+
   const amountValue = parseFloat(amountText);
   const canSave = !Number.isNaN(amountValue) && amountValue > 0 && category !== null;
 
@@ -166,6 +173,9 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
                   </TouchableOpacity>
                 );
               })}
+              {Array.from({ length: gridFillerCount }).map((_, i) => (
+                <View key={`filler-${i}`} style={[styles.tile, styles.tileFiller]} />
+              ))}
             </View>
 
             {category === SAVINGS_CATEGORY_KEY && (
@@ -308,6 +318,7 @@ const createStyles = (theme: AppTheme) =>
     tileIcon: { fontSize: 20, marginBottom: 2 },
     tileLabel: { fontSize: 9.5, fontWeight: '600', color: theme.text, textAlign: 'center' },
     tileLabelSelected: { color: '#FFFFFF' },
+    tileFiller: { backgroundColor: 'transparent', borderColor: 'transparent' },
     creditGateBanner: {
       flexDirection: 'row',
       justifyContent: 'space-between',
