@@ -8,6 +8,7 @@ import { formatPeso } from '../currency';
 import { endOfDay, formatFullDate, formatTimeOfDay, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
 import { isSavingsTransaction, savingsActionOf } from '../savings';
+import { isCreditCardPayment, isCreditPurchase } from '../creditCard';
 import { Transaction } from '../types';
 import { AppTheme, useTheme } from '../theme';
 import CyclePickerModal from '../components/CyclePickerModal';
@@ -151,6 +152,8 @@ export default function HistoryScreen() {
                     <Text style={styles.rowCategory}>
                       {meta.label}
                       {isSavings ? ` — ${isWithdrawal ? 'Withdrawal' : 'Deposit'}` : ''}
+                      {isCreditCardPayment(item) ? ' — Payment' : ''}
+                      {isCreditPurchase(item) ? ' · Credit' : ''}
                     </Text>
                     {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
                     <Text style={styles.rowTime}>{formatTimeOfDay(new Date(item.timestamp))}</Text>

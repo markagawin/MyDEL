@@ -10,9 +10,10 @@ import {
   View,
 } from 'react-native';
 import { CategoryMeta } from '../categories';
-import { CategoryKey, SavingsAction, Transaction } from '../types';
+import { CategoryKey, PaymentMethod, SavingsAction, Transaction } from '../types';
 import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY } from '../savings';
+import { CREDIT_CARD_CATEGORY_KEY } from '../creditCard';
 import { AppTheme, useTheme } from '../theme';
 import { noWebOutline } from '../webInputStyle';
 import DatePickerModal from './DatePickerModal';
@@ -28,6 +29,7 @@ interface Props {
       note?: string;
       timestamp: Date;
       savingsAction?: SavingsAction;
+      paymentMethod?: PaymentMethod;
     }
   ) => void;
   onClose: () => void;
@@ -39,6 +41,7 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [savingsAction, setSavingsAction] = useState<SavingsAction>('deposit');
+  const [creditGateActive, setCreditGateActive] = useState(false);
   const [note, setNote] = useState('');
   const [entryDate, setEntryDate] = useState(() => new Date());
   const [datePickerVisible, setDatePickerVisible] = useState(false);
@@ -48,10 +51,24 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
       setAmountText(String(transaction.amount));
       setCategory(transaction.category);
       setSavingsAction(transaction.savingsAction ?? 'deposit');
+      setCreditGateActive(
+        transaction.paymentMethod === 'credit' || transaction.category === CREDIT_CARD_CATEGORY_KEY
+      );
       setNote(transaction.note ?? '');
       setEntryDate(new Date(transaction.timestamp));
     }
   }, [transaction]);
+
+  const visibleCategories = useMemo(() => {
+    if (!creditGateActive) return categories;
+    const creditCardMeta = categories.find((c) => c.key === CREDIT_CARD_CATEGORY_KEY);
+    const realCategories = categories.filter(
+      (c) => c.key !== SAVINGS_CATEGORY_KEY && c.key !== CREDIT_CARD_CATEGORY_KEY
+    );
+    return creditCardMeta
+      ? [...realCategories, { ...creditCardMeta, label: 'Pay Credit Card' }]
+      : realCategories;
+  }, [categories, creditGateActive]);
 
   const amountValue = parseFloat(amountText);
   const canSave = !Number.isNaN(amountValue) && amountValue > 0 && category !== null;
@@ -68,12 +85,15 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
       original.getSeconds(),
       original.getMilliseconds()
     );
+    const isCreditCardPaymentEntry = category === CREDIT_CARD_CATEGORY_KEY;
+    const isCreditPurchaseEntry = creditGateActive && !isCreditCardPaymentEntry;
     onSave(transaction.id, {
       amount: amountValue,
       category,
       note: note.trim() || undefined,
       timestamp,
       savingsAction: category === SAVINGS_CATEGORY_KEY ? savingsAction : undefined,
+      paymentMethod: isCreditPurchaseEntry ? 'credit' : undefined,
     });
     onClose();
   };
@@ -101,13 +121,33 @@ export default function EditTransactionModal({ transaction, categories, onSave, 
             </View>
 
             <Text style={styles.fieldLabel}>CATEGORY</Text>
+
+            {creditGateActive && (
+              <View style={styles.creditGateBanner}>
+                <Text style={styles.creditGateBannerText}>💳 Using credit card</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setCreditGateActive(false);
+                    setCategory(null);
+                  }}
+                >
+                  <Text style={styles.creditGateBannerCancel}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.grid}>
-              {categories.map((cat) => {
+              {visibleCategories.map((cat) => {
                 const selected = category === cat.key;
                 return (
                   <TouchableOpacity
                     key={cat.key}
                     onPress={() => {
+                      if (cat.key === CREDIT_CARD_CATEGORY_KEY && !creditGateActive) {
+                        setCreditGateActive(true);
+                        setCategory(null);
+                        return;
+                      }
                       setCategory(cat.key);
                       setSavingsAction('deposit');
                     }}
@@ -268,6 +308,18 @@ const createStyles = (theme: AppTheme) =>
     tileIcon: { fontSize: 20, marginBottom: 2 },
     tileLabel: { fontSize: 9.5, fontWeight: '600', color: theme.text, textAlign: 'center' },
     tileLabelSelected: { color: '#FFFFFF' },
+    creditGateBanner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: theme.background,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 10,
+    },
+    creditGateBannerText: { fontSize: 13, fontWeight: '700', color: theme.text },
+    creditGateBannerCancel: { fontSize: 12.5, fontWeight: '700', color: theme.danger },
     savingsToggleRow: {
       flexDirection: 'row',
       backgroundColor: theme.background,

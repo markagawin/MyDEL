@@ -14,6 +14,7 @@ import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
 import CalendarSummaryModal from '../components/CalendarSummaryModal';
 import SavingsSummaryModal from '../components/SavingsSummaryModal';
 import { isSavingsTransaction } from '../savings';
+import { isCreditCardPayment } from '../creditCard';
 import { CategoryKey, Transaction } from '../types';
 
 export default function SummaryScreen() {
@@ -27,6 +28,7 @@ export default function SummaryScreen() {
     categories,
     categoryMap,
     totalSaved,
+    creditCardBalance,
   } = useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -71,7 +73,10 @@ export default function SummaryScreen() {
   const breakdown = useMemo(() => {
     const totals = new Map<CategoryKey, number>();
     for (const tx of transactions) {
-      if (!inRange(tx) || isSavingsTransaction(tx)) continue;
+      // Savings is a transfer, not spending. A credit card payment is excluded here too — the
+      // purchase it settles is already counted under its real category (Food, Gas, etc.) via
+      // its paymentMethod tag; counting the payment as well here would double it.
+      if (!inRange(tx) || isSavingsTransaction(tx) || isCreditCardPayment(tx)) continue;
       totals.set(tx.category, (totals.get(tx.category) ?? 0) + tx.amount);
     }
     const total = Array.from(totals.values()).reduce((s, v) => s + v, 0);
@@ -160,6 +165,14 @@ export default function SummaryScreen() {
           </View>
           <Text style={styles.savingsValue}>{formatPeso(totalSaved)}</Text>
         </TouchableOpacity>
+
+        <View style={styles.savingsCard}>
+          <View>
+            <Text style={styles.savingsLabel}>💳 Credit Card Owed</Text>
+            <Text style={styles.savingsHint}>Purchases minus payments, all time</Text>
+          </View>
+          <Text style={styles.savingsValue}>{formatPeso(creditCardBalance)}</Text>
+        </View>
 
         {highest ? (
           <View style={styles.highlightCard}>

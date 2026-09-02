@@ -9,6 +9,9 @@ export interface CustomCategory {
 
 export type SavingsAction = 'deposit' | 'withdrawal';
 
+/** 'credit' means this purchase was charged to the card, not paid in cash yet. */
+export type PaymentMethod = 'cash' | 'credit';
+
 export interface Transaction {
   id: string;
   amount: number;
@@ -18,6 +21,7 @@ export interface Transaction {
   cycleIdentifier: string;
   recurringSourceId?: string; // set when auto-logged from a RecurringEntry
   savingsAction?: SavingsAction; // only meaningful when category === 'savings'; undefined on older entries means 'deposit'
+  paymentMethod?: PaymentMethod; // 'credit' only when charged to the card; absent/'cash' otherwise
 }
 
 export interface RecurringEntry {

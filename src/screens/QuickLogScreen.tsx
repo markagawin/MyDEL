@@ -20,6 +20,7 @@ import { CategoryKey, SavingsAction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
+import { CREDIT_CARD_CATEGORY_KEY, isCreditPurchase } from '../creditCard';
 import { loadBannerViewState, saveBannerViewState } from '../storage';
 import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
@@ -48,6 +49,10 @@ export default function QuickLogScreen() {
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [savingsAction, setSavingsAction] = useState<SavingsAction>('deposit');
+  // True once the Credit Card tile has been tapped from the top-level grid — swaps the grid to
+  // "what was this for" (real categories + a Pay Credit Card option) so a credit purchase is
+  // always explicitly tied to a real category, never left as a bare "Credit Card" entry.
+  const [creditGateActive, setCreditGateActive] = useState(false);
   const [note, setNote] = useState('');
   const [entryDate, setEntryDate] = useState(() => new Date());
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
@@ -179,28 +184,50 @@ export default function QuickLogScreen() {
 
   // Net outflow for the current period: a savings deposit counts like any expense (money no
   // longer available), but a withdrawal gives money back, so it's subtracted rather than added.
-  // This is what "Remaining of paycheck" and the progress bar are based on.
+  // A credit card purchase doesn't touch this at all — no cash has actually left yet, only the
+  // eventual "Pay Credit Card" entry does. This is what "Remaining of paycheck" and the
+  // progress bar are based on.
   const periodTotal = useMemo(() => {
     return transactions
-      .filter((t) => t.cycleIdentifier === currentCycleIdentifier)
+      .filter((t) => t.cycleIdentifier === currentCycleIdentifier && !isCreditPurchase(t))
       .reduce((sum, t) => sum + (isSavingsTransaction(t) ? savingsSignedAmount(t) : t.amount), 0);
   }, [transactions, currentCycleIdentifier]);
 
-  // "Total spent so far" excludes savings entirely — putting money into or taking it out of
-  // savings isn't spending.
+  // "Total spent so far" excludes savings (moving money, not spending it) and credit purchases
+  // (no cash gone yet) — but a "Pay Credit Card" entry counts normally, since that's the moment
+  // real cash actually leaves.
   const periodSpentTotal = useMemo(() => {
     return transactions
-      .filter((t) => t.cycleIdentifier === currentCycleIdentifier && !isSavingsTransaction(t))
+      .filter(
+        (t) =>
+          t.cycleIdentifier === currentCycleIdentifier &&
+          !isSavingsTransaction(t) &&
+          !isCreditPurchase(t)
+      )
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions, currentCycleIdentifier]);
 
-  // Live total for just today, regardless of which cycle it falls in — also excludes savings.
+  // Live total for just today, regardless of which cycle it falls in — same exclusions.
   const todaySpentTotal = useMemo(() => {
     const now = new Date();
     return transactions
-      .filter((t) => !isSavingsTransaction(t) && sameDay(new Date(t.timestamp), now))
+      .filter((t) => !isSavingsTransaction(t) && !isCreditPurchase(t) && sameDay(new Date(t.timestamp), now))
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions]);
+
+  // Once the Credit Card gate is active, the grid swaps to "what was this for": real categories
+  // only (Savings and the Credit Card tile itself don't make sense as a credit purchase), plus a
+  // relabeled Credit Card tile that now means "log this as a card payment instead".
+  const visibleCategories = useMemo(() => {
+    if (!creditGateActive) return categories;
+    const creditCardMeta = categories.find((c) => c.key === CREDIT_CARD_CATEGORY_KEY);
+    const realCategories = categories.filter(
+      (c) => c.key !== SAVINGS_CATEGORY_KEY && c.key !== CREDIT_CARD_CATEGORY_KEY
+    );
+    return creditCardMeta
+      ? [...realCategories, { ...creditCardMeta, label: 'Pay Credit Card' }]
+      : realCategories;
+  }, [categories, creditGateActive]);
 
   const remaining = currentPaycheck !== null ? currentPaycheck - periodTotal : null;
   const pctSpent =
@@ -218,6 +245,11 @@ export default function QuickLogScreen() {
     const loggedNote = note;
     const loggedSavingsAction = savingsAction;
     const isSavings = loggedCategory === SAVINGS_CATEGORY_KEY;
+    const isCreditCardPaymentEntry = loggedCategory === CREDIT_CARD_CATEGORY_KEY;
+    // Reached the credit gate and picked a real category: this is a purchase charged to the
+    // card. Picking "Pay Credit Card" itself (loggedCategory === CREDIT_CARD_CATEGORY_KEY) is a
+    // payment instead, not a purchase, so it isn't tagged as one.
+    const isCreditPurchaseEntry = creditGateActive && !isCreditCardPaymentEntry;
 
     const now = new Date();
     const timestamp = new Date(
@@ -235,6 +267,7 @@ export default function QuickLogScreen() {
     setAmountBlurred(false);
     setEntryDate(new Date());
     setSavingsAction('deposit');
+    setCreditGateActive(false);
     amountInputRef.current?.blur();
 
     const newId = addTransaction({
@@ -243,6 +276,7 @@ export default function QuickLogScreen() {
       note: loggedNote,
       timestamp,
       savingsAction: isSavings ? loggedSavingsAction : undefined,
+      paymentMethod: isCreditPurchaseEntry ? 'credit' : undefined,
     });
 
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -251,7 +285,11 @@ export default function QuickLogScreen() {
         ? loggedSavingsAction === 'withdrawal'
           ? `${formatPeso(loggedAmount)} withdrawn from savings`
           : `${formatPeso(loggedAmount)} deposited to savings`
-        : `${formatPeso(loggedAmount)} added successfully`
+        : isCreditCardPaymentEntry
+          ? `${formatPeso(loggedAmount)} paid toward credit card`
+          : isCreditPurchaseEntry
+            ? `${formatPeso(loggedAmount)} charged to credit card`
+            : `${formatPeso(loggedAmount)} added successfully`
     );
     setToastUndoId(newId);
     setToastVisible(true);
@@ -405,13 +443,32 @@ export default function QuickLogScreen() {
             <Text style={styles.categoryPrompt}>👇 Pick a category for this amount</Text>
           )}
 
+          {creditGateActive && (
+            <View style={styles.creditGateBanner}>
+              <Text style={styles.creditGateBannerText}>💳 Using credit card</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCreditGateActive(false);
+                  setCategory(null);
+                }}
+              >
+                <Text style={styles.creditGateBannerCancel}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.grid}>
-            {categories.map((cat) => {
+            {visibleCategories.map((cat) => {
               const selected = category === cat.key;
               return (
                 <Pressable
                   key={cat.key}
                   onPress={() => {
+                    if (cat.key === CREDIT_CARD_CATEGORY_KEY && !creditGateActive) {
+                      setCreditGateActive(true);
+                      setCategory(null);
+                      return;
+                    }
                     setCategory(selected ? null : cat.key);
                     setSavingsAction('deposit');
                   }}
@@ -427,13 +484,15 @@ export default function QuickLogScreen() {
                 </Pressable>
               );
             })}
-            <Pressable
-              style={[styles.tile, styles.addTile]}
-              onPress={() => setAddCategoryModalVisible(true)}
-            >
-              <Text style={styles.addTileIcon}>+</Text>
-              <Text style={styles.addTileLabel}>Add</Text>
-            </Pressable>
+            {!creditGateActive && (
+              <Pressable
+                style={[styles.tile, styles.addTile]}
+                onPress={() => setAddCategoryModalVisible(true)}
+              >
+                <Text style={styles.addTileIcon}>+</Text>
+                <Text style={styles.addTileLabel}>Add</Text>
+              </Pressable>
+            )}
           </View>
 
           {category === SAVINGS_CATEGORY_KEY && (
@@ -645,6 +704,18 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
+  creditGateBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: theme.surfaceMuted,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  creditGateBannerText: { fontSize: 13, fontWeight: '700', color: theme.text },
+  creditGateBannerCancel: { fontSize: 12.5, fontWeight: '700', color: theme.danger },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

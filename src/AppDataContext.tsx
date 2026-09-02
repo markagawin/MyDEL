@@ -12,11 +12,13 @@ import {
   CustomCategory,
   CycleRange,
   CycleSettings,
+  PaymentMethod,
   RecurringEntry,
   SavingsAction,
   Transaction,
 } from './types';
 import { computeTotalSaved, SAVINGS_CATEGORY_KEY } from './savings';
+import { computeCreditCardBalance } from './creditCard';
 import { CATEGORIES, CATEGORY_MAP, CategoryMeta } from './categories';
 import {
   DEFAULT_SETTINGS,
@@ -55,6 +57,7 @@ interface AppDataContextValue {
   currentCycleIdentifier: string;
   currentPaycheck: number | null;
   totalSaved: number;
+  creditCardBalance: number;
   categories: CategoryMeta[];
   categoryMap: Record<string, CategoryMeta>;
   recurringEntries: RecurringEntry[];
@@ -68,6 +71,7 @@ interface AppDataContextValue {
     note?: string;
     timestamp?: Date;
     savingsAction?: SavingsAction;
+    paymentMethod?: PaymentMethod;
   }) => string;
   deleteTransaction: (id: string) => Promise<void>;
   updateTransaction: (
@@ -78,6 +82,7 @@ interface AppDataContextValue {
       note?: string;
       timestamp?: Date;
       savingsAction?: SavingsAction;
+      paymentMethod?: PaymentMethod;
     }
   ) => Promise<void>;
   updateSettings: (settings: CycleSettings) => Promise<void>;
@@ -173,7 +178,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [customCategories]);
 
   const addTransaction = useCallback<AppDataContextValue['addTransaction']>(
-    ({ amount, category, note, timestamp, savingsAction }) => {
+    ({ amount, category, note, timestamp, savingsAction, paymentMethod }) => {
       const when = timestamp ?? new Date();
       const cycleIdentifier = timestamp
         ? clipRangeToTrackingStart(getCycleRangeForDate(when, settings), trackingStartAsDate)
@@ -187,6 +192,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         timestamp: when.toISOString(),
         cycleIdentifier,
         savingsAction: category === SAVINGS_CATEGORY_KEY ? savingsAction ?? 'deposit' : undefined,
+        paymentMethod: paymentMethod === 'credit' ? 'credit' : undefined,
       };
       setTransactions((prev) => {
         const next = [tx, ...prev];
@@ -215,6 +221,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         note?: string;
         timestamp?: Date;
         savingsAction?: SavingsAction;
+        paymentMethod?: PaymentMethod;
       }
     ) => {
       setTransactions((prev) => {
@@ -227,6 +234,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             note: input.note && input.note.trim().length > 0 ? input.note.trim() : undefined,
             savingsAction:
               input.category === SAVINGS_CATEGORY_KEY ? input.savingsAction ?? 'deposit' : undefined,
+            paymentMethod: input.paymentMethod === 'credit' ? 'credit' : undefined,
           };
           if (input.timestamp) {
             updated.timestamp = input.timestamp.toISOString();
@@ -470,6 +478,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
+  const creditCardBalance = useMemo(() => computeCreditCardBalance(transactions), [transactions]);
 
   const value: AppDataContextValue = {
     loading,
@@ -479,6 +488,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     currentCycleIdentifier: currentCycleRange.identifier,
     currentPaycheck: paychecks[currentCycleRange.identifier] ?? null,
     totalSaved,
+    creditCardBalance,
     categories,
     categoryMap,
     recurringEntries,
