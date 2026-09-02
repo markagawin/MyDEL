@@ -32,14 +32,17 @@ const SPLASH_FADE_MS = 500;
 // shortcuts, a bookmarked tab) actually land on the right screen.
 //
 // `prefixes` is for scheme/host prefixes, not a bare path segment — it can't express GitHub
-// Pages' subpath hosting (/MyDEL/...). The path has to be baked into each screen's pattern
-// instead. Since the dev server serves the same source at the domain root (no /MyDEL/
-// segment), the prefix is derived at runtime from the current URL rather than hardcoded, so
-// both environments resolve correctly.
-const BASE_PATH =
-  typeof window !== 'undefined' && window.location.pathname.startsWith('/MyDEL')
-    ? 'MyDEL/'
-    : '';
+// Pages' subpath hosting (/RepoName/...). The path has to be baked into each screen's pattern
+// instead. The dev server serves the same source at the domain root, so the prefix can't be a
+// hardcoded repo name either — it has to work for any repo this gets deployed under (e.g. a
+// duplicate/backup copy hosted at a different subpath). Instead, treat the URL's first path
+// segment as a hosting prefix unless it's actually one of this app's own top-level route names.
+const KNOWN_TOP_LEVEL_ROUTES = ['Tabs', 'Settings'];
+const BASE_PATH = (() => {
+  if (typeof window === 'undefined') return '';
+  const firstSegment = window.location.pathname.split('/').filter(Boolean)[0];
+  return firstSegment && !KNOWN_TOP_LEVEL_ROUTES.includes(firstSegment) ? `${firstSegment}/` : '';
+})();
 
 const linking: LinkingOptions<ReactNavigation.RootParamList> = {
   prefixes: [],

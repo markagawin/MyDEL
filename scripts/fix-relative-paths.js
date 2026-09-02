@@ -8,6 +8,10 @@ const fs = require('fs');
 const path = require('path');
 
 const distDir = path.join(__dirname, '..', process.argv[2] || 'dist');
+// The hosting prefix — defaults to this repo's own GitHub Pages path, but a duplicate/backup
+// copy hosted under a different repo name needs its own prefix passed as the 3rd argument
+// (e.g. `node scripts/fix-relative-paths.js dist /MyDEL-V2/`).
+const basePath = process.argv[3] || '/MyDEL/';
 
 const indexPath = path.join(distDir, 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
@@ -17,7 +21,7 @@ html = html.replace(/src="\/(_expo\/[^"]+)"/, 'src="$1"');
 // history.replaceState before the deferred bundle <script> tag is parsed. Without an explicit
 // <base>, the browser resolves that tag's relative src against the now-changed path
 // (/MyDEL/Tabs/) instead of /MyDEL/, 404ing the bundle. An explicit base pins it regardless.
-html = html.replace('<head>', '<head>\n    <base href="/MyDEL/" />');
+html = html.replace('<head>', `<head>\n    <base href="${basePath}" />`);
 fs.writeFileSync(indexPath, html);
 
 const jsDir = path.join(distDir, '_expo', 'static', 'js', 'web');

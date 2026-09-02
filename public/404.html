@@ -8,9 +8,14 @@
       // client-side route (e.g. a PWA home-screen shortcut hard-navigating to /MyDEL/Tabs/History).
       // Redirect to index.html with the intended path in a query param; its restore script
       // rewrites the URL back before the app boots, so React Navigation sees the right route.
-      var path = location.pathname.replace(/^\/MyDEL\//, '');
+      // The hosting prefix (repo name) is taken from the URL itself rather than hardcoded, so
+      // the same file works for any repo this gets deployed under (e.g. a backup copy hosted
+      // under a different name).
+      var match = location.pathname.match(/^\/([^/]+)\//);
+      var prefix = match ? '/' + match[1] + '/' : '/';
+      var path = location.pathname.slice(prefix.length);
       location.replace(
-        '/MyDEL/?redirect=' + encodeURIComponent(path) +
+        prefix + '?redirect=' + encodeURIComponent(path) +
           (location.search ? '&' + location.search.slice(1) : '') +
           location.hash
       );
