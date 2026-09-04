@@ -1,17 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Borrower, CustomCategory, CycleSettings, RecurringEntry, Transaction } from './types';
 
-const TRANSACTIONS_KEY = '@mydel/transactions';
-const SETTINGS_KEY = '@mydel/settings';
-const TRACKING_START_KEY = '@mydel/trackingStartDate';
-const PAYCHECKS_KEY = '@mydel/paychecks';
-const CUSTOM_CATEGORIES_KEY = '@mydel/customCategories';
-const THEME_PREFERENCE_KEY = '@mydel/themePreference';
-const RECURRING_ENTRIES_KEY = '@mydel/recurringEntries';
-const PROFILE_NAME_KEY = '@mydel/profileName';
-const PROFILE_PHOTO_KEY = '@mydel/profilePhoto';
-const BANNER_VIEW_KEY = '@mydel/bannerView';
-const BORROWERS_KEY = '@mydel/borrowers';
+const TRANSACTIONS_KEY = '@mydel-v2/transactions';
+const SETTINGS_KEY = '@mydel-v2/settings';
+const TRACKING_START_KEY = '@mydel-v2/trackingStartDate';
+const PAYCHECKS_KEY = '@mydel-v2/paychecks';
+const CUSTOM_CATEGORIES_KEY = '@mydel-v2/customCategories';
+const THEME_PREFERENCE_KEY = '@mydel-v2/themePreference';
+const RECURRING_ENTRIES_KEY = '@mydel-v2/recurringEntries';
+const PROFILE_NAME_KEY = '@mydel-v2/profileName';
+const PROFILE_PHOTO_KEY = '@mydel-v2/profilePhoto';
+const BANNER_VIEW_KEY = '@mydel-v2/bannerView';
+const BORROWERS_KEY = '@mydel-v2/borrowers';
 
 export interface BannerViewState {
   cycleIdentifier: string;
