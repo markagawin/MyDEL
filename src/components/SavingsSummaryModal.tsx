@@ -15,12 +15,14 @@ import { formatFullDate, formatTimeOfDay } from '../cycleEngine';
 import { computeTotalSaved, isSavingsTransaction, savingsActionOf } from '../savings';
 import { AppTheme, useTheme } from '../theme';
 import AddSavingsGoalModal from './AddSavingsGoalModal';
+import ConfirmModal from './ConfirmModal';
 
 interface Props {
   visible: boolean;
   transactions: Transaction[];
   savingsGoals: SavingsGoal[];
   onAddSavingsGoal: (name: string) => string;
+  onRemoveSavingsGoal: (id: string) => void;
   onClose: () => void;
 }
 
@@ -34,6 +36,8 @@ interface Account {
   label: string;
   balance: number;
   sections: Section[];
+  entryCount: number;
+  isGoal: boolean;
 }
 
 const ALL_KEY = 'all';
@@ -80,12 +84,14 @@ export default function SavingsSummaryModal({
   transactions,
   savingsGoals,
   onAddSavingsGoal,
+  onRemoveSavingsGoal,
   onClose,
 }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [addGoalModalVisible, setAddGoalModalVisible] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string>(ALL_KEY);
+  const [pendingRemoveGoal, setPendingRemoveGoal] = useState<SavingsGoal | null>(null);
 
   const savingsTransactions = useMemo(
     () => transactions.filter(isSavingsTransaction),
@@ -96,11 +102,13 @@ export default function SavingsSummaryModal({
 
   // "All" is the original flat view (everything combined), followed by one account per goal
   // (even ones with no entries yet, so a freshly created goal is pickable right away) and a
-  // trailing "General Savings" account for untagged entries.
+  // trailing "General Savings" account for untagged entries. A transaction whose goal was since
+  // deleted falls back into General too, rather than vanishing from every account.
   const accounts = useMemo((): Account[] => {
+    const validGoalIds = new Set(savingsGoals.map((g) => g.id));
     const byGoal = new Map<string, Transaction[]>();
     for (const tx of savingsTransactions) {
-      const key = tx.savingsGoalId ?? GENERAL_GOAL_KEY;
+      const key = tx.savingsGoalId && validGoalIds.has(tx.savingsGoalId) ? tx.savingsGoalId : GENERAL_GOAL_KEY;
       if (!byGoal.has(key)) byGoal.set(key, []);
       byGoal.get(key)!.push(tx);
     }
@@ -110,18 +118,27 @@ export default function SavingsSummaryModal({
       label: 'All',
       balance: totalSaved,
       sections: buildSections(savingsTransactions),
+      entryCount: savingsTransactions.length,
+      isGoal: false,
     };
 
-    const named = savingsGoals.map((g) => ({ key: g.id, label: g.name, entries: byGoal.get(g.id) ?? [] }));
+    const named = savingsGoals.map((g) => ({
+      key: g.id,
+      label: g.name,
+      entries: byGoal.get(g.id) ?? [],
+      isGoal: true,
+    }));
     const general = byGoal.has(GENERAL_GOAL_KEY)
-      ? [{ key: GENERAL_GOAL_KEY, label: 'General Savings', entries: byGoal.get(GENERAL_GOAL_KEY)! }]
+      ? [{ key: GENERAL_GOAL_KEY, label: 'General Savings', entries: byGoal.get(GENERAL_GOAL_KEY)!, isGoal: false }]
       : [];
 
-    const goalAccounts = [...named, ...general].map(({ key, label, entries }) => ({
+    const goalAccounts = [...named, ...general].map(({ key, label, entries, isGoal }) => ({
       key,
       label,
       balance: balanceOf(entries),
       sections: buildSections(entries),
+      entryCount: entries.length,
+      isGoal,
     }));
 
     return [allAccount, ...goalAccounts];
@@ -139,6 +156,17 @@ export default function SavingsSummaryModal({
     const id = onAddSavingsGoal(name);
     setSelectedKey(id);
   };
+
+  const handleConfirmRemove = () => {
+    if (!pendingRemoveGoal) return;
+    onRemoveSavingsGoal(pendingRemoveGoal.id);
+    if (selectedKey === pendingRemoveGoal.id) setSelectedKey(ALL_KEY);
+    setPendingRemoveGoal(null);
+  };
+
+  const pendingRemoveCount = pendingRemoveGoal
+    ? accounts.find((a) => a.key === pendingRemoveGoal.id)?.entryCount ?? 0
+    : 0;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -172,9 +200,22 @@ export default function SavingsSummaryModal({
             return (
               <TouchableOpacity
                 key={a.key}
-                style={[styles.accountBox, isSelected && styles.accountBoxSelected]}
+                style={[
+                  styles.accountBox,
+                  a.isGoal && styles.accountBoxWithRemove,
+                  isSelected && styles.accountBoxSelected,
+                ]}
                 onPress={() => setSelectedKey(a.key)}
               >
+                {a.isGoal && (
+                  <TouchableOpacity
+                    accessibilityLabel={`Remove ${a.label}`}
+                    style={styles.accountRemoveButton}
+                    onPress={() => setPendingRemoveGoal({ id: a.key, name: a.label })}
+                  >
+                    <Text style={styles.accountRemoveIcon}>🗑️</Text>
+                  </TouchableOpacity>
+                )}
                 <Text style={[styles.accountLabel, isSelected && styles.accountLabelSelected]}>
                   {a.label}
                 </Text>
@@ -236,6 +277,21 @@ export default function SavingsSummaryModal({
         onSave={handleAddGoal}
         onClose={() => setAddGoalModalVisible(false)}
       />
+
+      <ConfirmModal
+        visible={pendingRemoveGoal !== null}
+        title="Remove savings goal?"
+        message={
+          pendingRemoveGoal
+            ? pendingRemoveCount > 0
+              ? `"${pendingRemoveGoal.name}" has ${pendingRemoveCount} entr${pendingRemoveCount === 1 ? 'y' : 'ies'} logged. They'll show under General Savings if you remove it.`
+              : `Remove "${pendingRemoveGoal.name}"?`
+            : undefined
+        }
+        confirmLabel="Remove"
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setPendingRemoveGoal(null)}
+      />
     </Modal>
   );
 }
@@ -277,6 +333,7 @@ const createStyles = (theme: AppTheme) =>
       gap: 10,
     },
     accountBox: {
+      position: 'relative',
       minWidth: 96,
       borderRadius: 14,
       borderWidth: 1.5,
@@ -286,10 +343,21 @@ const createStyles = (theme: AppTheme) =>
       paddingVertical: 10,
       marginRight: 10,
     },
+    accountBoxWithRemove: { paddingRight: 26 },
     accountBoxSelected: { backgroundColor: theme.navy, borderColor: theme.navy },
     accountLabel: { fontSize: 12.5, fontWeight: '700', color: theme.text },
     accountLabelSelected: { color: '#FFFFFF' },
     accountBalance: { fontSize: 13.5, fontWeight: '800', color: theme.text, marginTop: 3 },
+    accountRemoveButton: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    accountRemoveIcon: { fontSize: 11 },
     addBox: {
       borderStyle: 'dashed',
       backgroundColor: theme.background,
