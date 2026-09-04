@@ -193,6 +193,7 @@ export default function SavingsSummaryModal({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.accountScroll}
           contentContainerStyle={styles.accountRow}
         >
           {accounts.map((a) => {
@@ -234,42 +235,44 @@ export default function SavingsSummaryModal({
           </TouchableOpacity>
         </ScrollView>
 
-        {selected.sections.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              {selected.key === ALL_KEY
-                ? 'No savings deposits or withdrawals logged yet.'
-                : 'Nothing logged for this account yet.'}
-            </Text>
-          </View>
-        ) : (
-          <SectionList
-            sections={selected.sections}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-            renderSectionHeader={({ section }) => (
-              <Text style={styles.sectionHeader}>{section.title}</Text>
-            )}
-            renderItem={({ item }) => {
-              const isWithdrawal = savingsActionOf(item) === 'withdrawal';
-              return (
-                <View style={styles.row}>
-                  <View style={styles.rowMiddle}>
-                    <Text style={styles.rowLabel}>{isWithdrawal ? 'Withdrawal' : 'Deposit'}</Text>
-                    {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
-                    <Text style={styles.rowTime}>
-                      {formatFullDate(new Date(item.timestamp))} · {formatTimeOfDay(new Date(item.timestamp))}
+        <View style={styles.listArea}>
+          {selected.sections.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>
+                {selected.key === ALL_KEY
+                  ? 'No savings deposits or withdrawals logged yet.'
+                  : 'Nothing logged for this account yet.'}
+              </Text>
+            </View>
+          ) : (
+            <SectionList
+              sections={selected.sections}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+              renderSectionHeader={({ section }) => (
+                <Text style={styles.sectionHeader}>{section.title}</Text>
+              )}
+              renderItem={({ item }) => {
+                const isWithdrawal = savingsActionOf(item) === 'withdrawal';
+                return (
+                  <View style={styles.row}>
+                    <View style={styles.rowMiddle}>
+                      <Text style={styles.rowLabel}>{isWithdrawal ? 'Withdrawal' : 'Deposit'}</Text>
+                      {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
+                      <Text style={styles.rowTime}>
+                        {formatFullDate(new Date(item.timestamp))} · {formatTimeOfDay(new Date(item.timestamp))}
+                      </Text>
+                    </View>
+                    <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
+                      {isWithdrawal ? '− ' : '+ '}
+                      {formatPeso(item.amount)}
                     </Text>
                   </View>
-                  <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
-                    {isWithdrawal ? '− ' : '+ '}
-                    {formatPeso(item.amount)}
-                  </Text>
-                </View>
-              );
-            }}
-          />
-        )}
+                );
+              }}
+            />
+          )}
+        </View>
       </SafeAreaView>
 
       <AddSavingsGoalModal
@@ -327,6 +330,11 @@ const createStyles = (theme: AppTheme) =>
     },
     totalLabel: { color: '#9FB2D6', fontSize: 12, fontWeight: '700', marginBottom: 4 },
     totalValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
+    // ScrollView defaults to flexGrow: 1 on web, which would let this single row of boxes
+    // stretch to fill whatever space the list below doesn't need (most visible when that
+    // list is short or empty). Pin it to its own content height instead - `listArea` below
+    // is the one that should actually grow to fill the rest of the modal.
+    accountScroll: { flexGrow: 0, flexShrink: 0 },
     accountRow: {
       paddingHorizontal: 20,
       paddingVertical: 14,
@@ -366,6 +374,7 @@ const createStyles = (theme: AppTheme) =>
     },
     addBoxIcon: { fontSize: 18, color: theme.textMuted, fontWeight: '700' },
     addBoxLabel: { fontSize: 11.5, fontWeight: '700', color: theme.textMuted, marginTop: 2 },
+    listArea: { flex: 1 },
     emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
     emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center' },
     sectionHeader: {
