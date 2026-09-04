@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Animated,
   Modal,
-  PanResponder,
+  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -15,7 +14,6 @@ import { formatPeso } from '../currency';
 import { formatFullDate, formatTimeOfDay } from '../cycleEngine';
 import { computeTotalSaved, isSavingsTransaction, savingsActionOf } from '../savings';
 import { AppTheme, useTheme } from '../theme';
-import { webPanYOnly } from '../webInputStyle';
 import AddSavingsGoalModal from './AddSavingsGoalModal';
 
 interface Props {
@@ -31,15 +29,15 @@ interface Section {
   data: Transaction[];
 }
 
-interface Page {
+interface Account {
   key: string;
   label: string;
   balance: number;
   sections: Section[];
 }
 
+const ALL_KEY = 'all';
 const GENERAL_GOAL_KEY = '__general__';
-const ADD_SLOT_KEY = '__add__';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -87,19 +85,19 @@ export default function SavingsSummaryModal({
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [addGoalModalVisible, setAddGoalModalVisible] = useState(false);
-  const pendingFocusGoalIdRef = useRef<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string>(ALL_KEY);
 
   const savingsTransactions = useMemo(
     () => transactions.filter(isSavingsTransaction),
     [transactions]
   );
 
-  // Page 0 is everything combined (the original flat view), followed by one page per goal
-  // (even ones with no entries yet, so a freshly created goal is visible right away) and a
-  // trailing "General Savings" page for untagged entries. When there's only one such bucket,
-  // the combined view would show exactly the same numbers as that one bucket - skip it rather
-  // than show a duplicate page. A final "add new" slot always comes after the data pages.
-  const pages = useMemo((): Page[] => {
+  const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
+
+  // "All" is the original flat view (everything combined), followed by one account per goal
+  // (even ones with no entries yet, so a freshly created goal is pickable right away) and a
+  // trailing "General Savings" account for untagged entries.
+  const accounts = useMemo((): Account[] => {
     const byGoal = new Map<string, Transaction[]>();
     for (const tx of savingsTransactions) {
       const key = tx.savingsGoalId ?? GENERAL_GOAL_KEY;
@@ -107,10 +105,10 @@ export default function SavingsSummaryModal({
       byGoal.get(key)!.push(tx);
     }
 
-    const allPage: Page = {
-      key: 'all',
-      label: 'Total Saved',
-      balance: computeTotalSaved(transactions),
+    const allAccount: Account = {
+      key: ALL_KEY,
+      label: 'All',
+      balance: totalSaved,
       sections: buildSections(savingsTransactions),
     };
 
@@ -119,110 +117,27 @@ export default function SavingsSummaryModal({
       ? [{ key: GENERAL_GOAL_KEY, label: 'General Savings', entries: byGoal.get(GENERAL_GOAL_KEY)! }]
       : [];
 
-    const goalPages = [...named, ...general]
-      .map(({ key, label, entries }) => ({
-        key,
-        label,
-        balance: balanceOf(entries),
-        sections: buildSections(entries),
-      }))
-      .sort((a, b) => b.balance - a.balance);
+    const goalAccounts = [...named, ...general].map(({ key, label, entries }) => ({
+      key,
+      label,
+      balance: balanceOf(entries),
+      sections: buildSections(entries),
+    }));
 
-    return goalPages.length === 1 ? goalPages : [allPage, ...goalPages];
-  }, [transactions, savingsGoals, savingsTransactions]);
+    return [allAccount, ...goalAccounts];
+  }, [totalSaved, savingsGoals, savingsTransactions]);
 
-  // The swipeable track always ends in one extra "+ Add New Savings" slot after the data pages.
-  const slotCount = pages.length + 1;
-  const addSlotIndex = pages.length;
+  const selected = accounts.find((a) => a.key === selectedKey) ?? accounts[0];
 
-  const [page, setPage] = useState(0);
-  const pageIndex = Math.min(page, Math.max(0, slotCount - 1));
-
-  const trackWidthRef = useRef(0);
-  const [trackWidth, setTrackWidthState] = useState(0);
-  const setTrackWidth = (width: number) => {
-    trackWidthRef.current = width;
-    setTrackWidthState(width);
-  };
-  const translateX = useRef(new Animated.Value(0)).current;
-  const hasPositionedRef = useRef(false);
-
-  // Reset to the first page whenever the modal is reopened, so it doesn't reopen on
-  // whatever goal happened to be showing last time.
+  // Reset to "All" whenever the modal is reopened, so it doesn't reopen on whatever
+  // account happened to be picked last time.
   useEffect(() => {
-    if (visible) {
-      setPage(0);
-      hasPositionedRef.current = false;
-    }
+    if (visible) setSelectedKey(ALL_KEY);
   }, [visible]);
-
-  // After creating a goal from inside this modal, swipe straight to its (still empty) page
-  // once it shows up in `pages`, instead of leaving the user on the "+ Add New" slot.
-  useEffect(() => {
-    const pendingId = pendingFocusGoalIdRef.current;
-    if (!pendingId) return;
-    const index = pages.findIndex((p) => p.key === pendingId);
-    if (index !== -1) {
-      setPage(index);
-      pendingFocusGoalIdRef.current = null;
-    }
-  }, [pages]);
-
-  useEffect(() => {
-    if (trackWidth === 0) return;
-    const toValue = -pageIndex * trackWidth;
-    if (!hasPositionedRef.current) {
-      hasPositionedRef.current = true;
-      translateX.setValue(toValue);
-      return;
-    }
-    Animated.timing(translateX, { toValue, duration: 260, useNativeDriver: false }).start();
-  }, [pageIndex, trackWidth]);
-
-  const settleTo = (target: number) => {
-    Animated.timing(translateX, {
-      toValue: -target * trackWidthRef.current,
-      duration: 220,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 5,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: () => {
-          translateX.stopAnimation();
-          translateX.setOffset(-pageIndex * trackWidthRef.current);
-          translateX.setValue(0);
-        },
-        onPanResponderMove: Animated.event([null, { dx: translateX }], { useNativeDriver: false }),
-        onPanResponderRelease: (_, gesture) => {
-          translateX.flattenOffset();
-          const width = trackWidthRef.current || 1;
-          const passedDistance = Math.abs(gesture.dx) > width * 0.12;
-          const passedVelocity = Math.abs(gesture.vx) > 0.3;
-          let target = pageIndex;
-          if (passedDistance || passedVelocity) {
-            const direction = passedVelocity ? gesture.vx : gesture.dx;
-            target = Math.max(0, Math.min(slotCount - 1, pageIndex + (direction < 0 ? 1 : -1)));
-          }
-          settleTo(target);
-          if (target !== pageIndex) setPage(target);
-        },
-        onPanResponderTerminate: () => {
-          translateX.flattenOffset();
-          settleTo(pageIndex);
-        },
-      }),
-    [pageIndex, slotCount]
-  );
 
   const handleAddGoal = (name: string) => {
     const id = onAddSavingsGoal(name);
-    pendingFocusGoalIdRef.current = id;
+    setSelectedKey(id);
   };
 
   return (
@@ -242,87 +157,78 @@ export default function SavingsSummaryModal({
           </TouchableOpacity>
         </View>
 
-        <View
-          style={[styles.carouselClip, webPanYOnly]}
-          onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-          {...panResponder.panHandlers}
+        <View style={styles.totalCard}>
+          <Text style={styles.totalLabel}>Total Saved</Text>
+          <Text style={styles.totalValue}>{formatPeso(totalSaved)}</Text>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.accountRow}
         >
-          <Animated.View
-            style={[
-              styles.carouselTrack,
-              { width: trackWidth * slotCount, transform: [{ translateX }] },
-            ]}
-          >
-            {pages.map((p) => (
-              <View key={p.key} style={{ width: trackWidth }}>
-                <View style={styles.totalCard}>
-                  <Text style={styles.totalLabel}>{p.label}</Text>
-                  <Text style={styles.totalValue}>{formatPeso(p.balance)}</Text>
-                </View>
-
-                {p.sections.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>Nothing logged for this goal yet.</Text>
-                  </View>
-                ) : (
-                  <SectionList
-                    sections={p.sections}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-                    renderSectionHeader={({ section }) => (
-                      <Text style={styles.sectionHeader}>{section.title}</Text>
-                    )}
-                    renderItem={({ item }) => {
-                      const isWithdrawal = savingsActionOf(item) === 'withdrawal';
-                      return (
-                        <View style={styles.row}>
-                          <View style={styles.rowMiddle}>
-                            <Text style={styles.rowLabel}>
-                              {isWithdrawal ? 'Withdrawal' : 'Deposit'}
-                            </Text>
-                            {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
-                            <Text style={styles.rowTime}>
-                              {formatFullDate(new Date(item.timestamp))} ·{' '}
-                              {formatTimeOfDay(new Date(item.timestamp))}
-                            </Text>
-                          </View>
-                          <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
-                            {isWithdrawal ? '− ' : '+ '}
-                            {formatPeso(item.amount)}
-                          </Text>
-                        </View>
-                      );
-                    }}
-                  />
-                )}
-              </View>
-            ))}
-
-            <View key={ADD_SLOT_KEY} style={{ width: trackWidth }}>
+          {accounts.map((a) => {
+            const isSelected = a.key === selected.key;
+            return (
               <TouchableOpacity
-                style={styles.addSlotCard}
-                onPress={() => setAddGoalModalVisible(true)}
+                key={a.key}
+                style={[styles.accountBox, isSelected && styles.accountBoxSelected]}
+                onPress={() => setSelectedKey(a.key)}
               >
-                <Text style={styles.addSlotIcon}>+</Text>
-                <Text style={styles.addSlotLabel}>Add New Savings</Text>
+                <Text style={[styles.accountLabel, isSelected && styles.accountLabelSelected]}>
+                  {a.label}
+                </Text>
+                <Text style={[styles.accountBalance, isSelected && styles.accountLabelSelected]}>
+                  {formatPeso(a.balance)}
+                </Text>
               </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
+            );
+          })}
+          <TouchableOpacity
+            style={[styles.accountBox, styles.addBox]}
+            onPress={() => setAddGoalModalVisible(true)}
+          >
+            <Text style={styles.addBoxIcon}>+</Text>
+            <Text style={styles.addBoxLabel}>Add New</Text>
+          </TouchableOpacity>
+        </ScrollView>
 
-        <View style={styles.dots}>
-          {Array.from({ length: slotCount }).map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => setPage(i)}>
-              <View
-                style={[
-                  styles.dot,
-                  i === addSlotIndex && styles.dotAdd,
-                  i === pageIndex && styles.dotActive,
-                ]}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
+        {selected.sections.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>
+              {selected.key === ALL_KEY
+                ? 'No savings deposits or withdrawals logged yet.'
+                : 'Nothing logged for this account yet.'}
+            </Text>
+          </View>
+        ) : (
+          <SectionList
+            sections={selected.sections}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+            renderSectionHeader={({ section }) => (
+              <Text style={styles.sectionHeader}>{section.title}</Text>
+            )}
+            renderItem={({ item }) => {
+              const isWithdrawal = savingsActionOf(item) === 'withdrawal';
+              return (
+                <View style={styles.row}>
+                  <View style={styles.rowMiddle}>
+                    <Text style={styles.rowLabel}>{isWithdrawal ? 'Withdrawal' : 'Deposit'}</Text>
+                    {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
+                    <Text style={styles.rowTime}>
+                      {formatFullDate(new Date(item.timestamp))} · {formatTimeOfDay(new Date(item.timestamp))}
+                    </Text>
+                  </View>
+                  <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
+                    {isWithdrawal ? '− ' : '+ '}
+                    {formatPeso(item.amount)}
+                  </Text>
+                </View>
+              );
+            }}
+          />
+        )}
       </SafeAreaView>
 
       <AddSavingsGoalModal
@@ -355,10 +261,6 @@ const createStyles = (theme: AppTheme) =>
     closeButtonText: { fontSize: 16, color: theme.textMuted, fontWeight: '700' },
     addButtonText: { fontSize: 20, color: theme.navy, fontWeight: '700' },
     headerTitle: { fontSize: 18, fontWeight: '800', color: theme.navy },
-    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-    emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center' },
-    carouselClip: { flex: 1, overflow: 'hidden' },
-    carouselTrack: { flexDirection: 'row', flex: 1 },
     totalCard: {
       backgroundColor: theme.navy,
       borderRadius: 16,
@@ -369,6 +271,35 @@ const createStyles = (theme: AppTheme) =>
     },
     totalLabel: { color: '#9FB2D6', fontSize: 12, fontWeight: '700', marginBottom: 4 },
     totalValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
+    accountRow: {
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      gap: 10,
+    },
+    accountBox: {
+      minWidth: 96,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginRight: 10,
+    },
+    accountBoxSelected: { backgroundColor: theme.navy, borderColor: theme.navy },
+    accountLabel: { fontSize: 12.5, fontWeight: '700', color: theme.text },
+    accountLabelSelected: { color: '#FFFFFF' },
+    accountBalance: { fontSize: 13.5, fontWeight: '800', color: theme.text, marginTop: 3 },
+    addBox: {
+      borderStyle: 'dashed',
+      backgroundColor: theme.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addBoxIcon: { fontSize: 18, color: theme.textMuted, fontWeight: '700' },
+    addBoxLabel: { fontSize: 11.5, fontWeight: '700', color: theme.textMuted, marginTop: 2 },
+    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+    emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center' },
     sectionHeader: {
       fontSize: 12,
       fontWeight: '700',
@@ -393,33 +324,4 @@ const createStyles = (theme: AppTheme) =>
     rowTime: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
     rowAmount: { fontSize: 15, fontWeight: '700', color: theme.text },
     rowAmountWithdrawal: { color: theme.success },
-    addSlotCard: {
-      flex: 1,
-      marginHorizontal: 20,
-      marginTop: 12,
-      marginBottom: 20,
-      borderRadius: 16,
-      borderWidth: 1.5,
-      borderStyle: 'dashed',
-      borderColor: theme.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-    },
-    addSlotIcon: { fontSize: 28, color: theme.textMuted, fontWeight: '700' },
-    addSlotLabel: { fontSize: 14, fontWeight: '700', color: theme.textMuted },
-    dots: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 12,
-    },
-    dot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: theme.border,
-    },
-    dotAdd: { borderWidth: 1, borderColor: theme.textMuted, backgroundColor: 'transparent' },
-    dotActive: { backgroundColor: theme.navy, borderColor: theme.navy },
   });
