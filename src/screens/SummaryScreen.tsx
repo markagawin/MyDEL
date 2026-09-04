@@ -14,6 +14,7 @@ import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
 import CalendarSummaryModal from '../components/CalendarSummaryModal';
 import SavingsSummaryModal from '../components/SavingsSummaryModal';
 import LendingSummaryModal from '../components/LendingSummaryModal';
+import CreditCardSummaryModal from '../components/CreditCardSummaryModal';
 import { isSavingsTransaction } from '../savings';
 import { isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
@@ -41,6 +42,7 @@ export default function SummaryScreen() {
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [savingsVisible, setSavingsVisible] = useState(false);
   const [lendingVisible, setLendingVisible] = useState(false);
+  const [creditCardVisible, setCreditCardVisible] = useState(false);
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
 
@@ -179,13 +181,13 @@ export default function SummaryScreen() {
           <Text style={styles.savingsValue}>{formatPeso(totalSaved)}</Text>
         </TouchableOpacity>
 
-        <View style={styles.savingsCard}>
+        <TouchableOpacity style={styles.savingsCard} onPress={() => setCreditCardVisible(true)}>
           <View>
             <Text style={styles.savingsLabel}>💳 Credit Card Owed</Text>
             <Text style={styles.savingsHint}>Purchases minus payments, all time</Text>
           </View>
           <Text style={styles.savingsValue}>{formatPeso(creditCardBalance)}</Text>
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.savingsCard} onPress={() => setLendingVisible(true)}>
           <View>
@@ -334,6 +336,13 @@ export default function SummaryScreen() {
         transactions={transactions}
         borrowers={borrowers}
         onClose={() => setLendingVisible(false)}
+      />
+
+      <CreditCardSummaryModal
+        visible={creditCardVisible}
+        transactions={transactions}
+        categoryMap={categoryMap}
+        onClose={() => setCreditCardVisible(false)}
       />
     </SafeAreaView>
   );
