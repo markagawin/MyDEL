@@ -16,11 +16,13 @@ import { formatFullDate, formatTimeOfDay } from '../cycleEngine';
 import { computeTotalSaved, isSavingsTransaction, savingsActionOf } from '../savings';
 import { AppTheme, useTheme } from '../theme';
 import { webPanYOnly } from '../webInputStyle';
+import AddSavingsGoalModal from './AddSavingsGoalModal';
 
 interface Props {
   visible: boolean;
   transactions: Transaction[];
   savingsGoals: SavingsGoal[];
+  onAddSavingsGoal: (name: string) => string;
   onClose: () => void;
 }
 
@@ -37,6 +39,7 @@ interface Page {
 }
 
 const GENERAL_GOAL_KEY = '__general__';
+const ADD_SLOT_KEY = '__add__';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -74,9 +77,17 @@ function balanceOf(entries: Transaction[]): number {
   return entries.reduce((sum, t) => sum + (savingsActionOf(t) === 'withdrawal' ? -t.amount : t.amount), 0);
 }
 
-export default function SavingsSummaryModal({ visible, transactions, savingsGoals, onClose }: Props) {
+export default function SavingsSummaryModal({
+  visible,
+  transactions,
+  savingsGoals,
+  onAddSavingsGoal,
+  onClose,
+}: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [addGoalModalVisible, setAddGoalModalVisible] = useState(false);
+  const pendingFocusGoalIdRef = useRef<string | null>(null);
 
   const savingsTransactions = useMemo(
     () => transactions.filter(isSavingsTransaction),
@@ -84,7 +95,8 @@ export default function SavingsSummaryModal({ visible, transactions, savingsGoal
   );
 
   // Page 0 is everything combined (the original flat view). Swiping past it reaches one page
-  // per goal that has entries, plus a trailing "General Savings" page for untagged ones.
+  // per goal (even ones with no entries yet, so a freshly created goal is visible right away),
+  // then a trailing "General Savings" page for untagged entries, then a final "add new" slot.
   const pages = useMemo((): Page[] => {
     const byGoal = new Map<string, Transaction[]>();
     for (const tx of savingsTransactions) {
@@ -100,9 +112,7 @@ export default function SavingsSummaryModal({ visible, transactions, savingsGoal
       sections: buildSections(savingsTransactions),
     };
 
-    const named = savingsGoals
-      .filter((g) => byGoal.has(g.id))
-      .map((g) => ({ key: g.id, label: g.name, entries: byGoal.get(g.id)! }));
+    const named = savingsGoals.map((g) => ({ key: g.id, label: g.name, entries: byGoal.get(g.id) ?? [] }));
     const general = byGoal.has(GENERAL_GOAL_KEY)
       ? [{ key: GENERAL_GOAL_KEY, label: 'General Savings', entries: byGoal.get(GENERAL_GOAL_KEY)! }]
       : [];
@@ -119,8 +129,12 @@ export default function SavingsSummaryModal({ visible, transactions, savingsGoal
     return [allPage, ...goalPages];
   }, [transactions, savingsGoals, savingsTransactions]);
 
+  // The swipeable track always ends in one extra "+ Add New Savings" slot after the data pages.
+  const slotCount = pages.length + 1;
+  const addSlotIndex = pages.length;
+
   const [page, setPage] = useState(0);
-  const pageIndex = Math.min(page, Math.max(0, pages.length - 1));
+  const pageIndex = Math.min(page, Math.max(0, slotCount - 1));
 
   const trackWidthRef = useRef(0);
   const [trackWidth, setTrackWidthState] = useState(0);
@@ -139,6 +153,18 @@ export default function SavingsSummaryModal({ visible, transactions, savingsGoal
       hasPositionedRef.current = false;
     }
   }, [visible]);
+
+  // After creating a goal from inside this modal, swipe straight to its (still empty) page
+  // once it shows up in `pages`, instead of leaving the user on the "+ Add New" slot.
+  useEffect(() => {
+    const pendingId = pendingFocusGoalIdRef.current;
+    if (!pendingId) return;
+    const index = pages.findIndex((p) => p.key === pendingId);
+    if (index !== -1) {
+      setPage(index);
+      pendingFocusGoalIdRef.current = null;
+    }
+  }, [pages]);
 
   useEffect(() => {
     if (trackWidth === 0) return;
@@ -179,7 +205,7 @@ export default function SavingsSummaryModal({ visible, transactions, savingsGoal
           let target = pageIndex;
           if (passedDistance || passedVelocity) {
             const direction = passedVelocity ? gesture.vx : gesture.dx;
-            target = Math.max(0, Math.min(pages.length - 1, pageIndex + (direction < 0 ? 1 : -1)));
+            target = Math.max(0, Math.min(slotCount - 1, pageIndex + (direction < 0 ? 1 : -1)));
           }
           settleTo(target);
           if (target !== pageIndex) setPage(target);
@@ -189,8 +215,13 @@ export default function SavingsSummaryModal({ visible, transactions, savingsGoal
           settleTo(pageIndex);
         },
       }),
-    [pageIndex, pages.length]
+    [pageIndex, slotCount]
   );
+
+  const handleAddGoal = (name: string) => {
+    const id = onAddSavingsGoal(name);
+    pendingFocusGoalIdRef.current = id;
+  };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -200,79 +231,103 @@ export default function SavingsSummaryModal({ visible, transactions, savingsGoal
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Savings</Text>
-          <View style={styles.closeButton} />
+          <TouchableOpacity
+            accessibilityLabel="Add new savings"
+            onPress={() => setAddGoalModalVisible(true)}
+            style={styles.closeButton}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
         </View>
 
-        {pages.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No savings deposits or withdrawals logged yet.</Text>
-          </View>
-        ) : (
-          <>
-            <View
-              style={[styles.carouselClip, webPanYOnly]}
-              onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-              {...panResponder.panHandlers}
-            >
-              <Animated.View
-                style={[
-                  styles.carouselTrack,
-                  { width: trackWidth * pages.length, transform: [{ translateX }] },
-                ]}
-              >
-                {pages.map((p) => (
-                  <View key={p.key} style={{ width: trackWidth }}>
-                    <View style={styles.totalCard}>
-                      <Text style={styles.totalLabel}>{p.label}</Text>
-                      <Text style={styles.totalValue}>{formatPeso(p.balance)}</Text>
-                    </View>
+        <View
+          style={[styles.carouselClip, webPanYOnly]}
+          onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+          {...panResponder.panHandlers}
+        >
+          <Animated.View
+            style={[
+              styles.carouselTrack,
+              { width: trackWidth * slotCount, transform: [{ translateX }] },
+            ]}
+          >
+            {pages.map((p) => (
+              <View key={p.key} style={{ width: trackWidth }}>
+                <View style={styles.totalCard}>
+                  <Text style={styles.totalLabel}>{p.label}</Text>
+                  <Text style={styles.totalValue}>{formatPeso(p.balance)}</Text>
+                </View>
 
-                    <SectionList
-                      sections={p.sections}
-                      keyExtractor={(item) => item.id}
-                      contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-                      renderSectionHeader={({ section }) => (
-                        <Text style={styles.sectionHeader}>{section.title}</Text>
-                      )}
-                      renderItem={({ item }) => {
-                        const isWithdrawal = savingsActionOf(item) === 'withdrawal';
-                        return (
-                          <View style={styles.row}>
-                            <View style={styles.rowMiddle}>
-                              <Text style={styles.rowLabel}>
-                                {isWithdrawal ? 'Withdrawal' : 'Deposit'}
-                              </Text>
-                              {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
-                              <Text style={styles.rowTime}>
-                                {formatFullDate(new Date(item.timestamp))} ·{' '}
-                                {formatTimeOfDay(new Date(item.timestamp))}
-                              </Text>
-                            </View>
-                            <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
-                              {isWithdrawal ? '− ' : '+ '}
-                              {formatPeso(item.amount)}
+                {p.sections.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>Nothing logged for this goal yet.</Text>
+                  </View>
+                ) : (
+                  <SectionList
+                    sections={p.sections}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+                    renderSectionHeader={({ section }) => (
+                      <Text style={styles.sectionHeader}>{section.title}</Text>
+                    )}
+                    renderItem={({ item }) => {
+                      const isWithdrawal = savingsActionOf(item) === 'withdrawal';
+                      return (
+                        <View style={styles.row}>
+                          <View style={styles.rowMiddle}>
+                            <Text style={styles.rowLabel}>
+                              {isWithdrawal ? 'Withdrawal' : 'Deposit'}
+                            </Text>
+                            {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
+                            <Text style={styles.rowTime}>
+                              {formatFullDate(new Date(item.timestamp))} ·{' '}
+                              {formatTimeOfDay(new Date(item.timestamp))}
                             </Text>
                           </View>
-                        );
-                      }}
-                    />
-                  </View>
-                ))}
-              </Animated.View>
-            </View>
-
-            {pages.length > 1 && (
-              <View style={styles.dots}>
-                {pages.map((p, i) => (
-                  <TouchableOpacity key={p.key} onPress={() => setPage(i)}>
-                    <View style={[styles.dot, i === pageIndex && styles.dotActive]} />
-                  </TouchableOpacity>
-                ))}
+                          <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
+                            {isWithdrawal ? '− ' : '+ '}
+                            {formatPeso(item.amount)}
+                          </Text>
+                        </View>
+                      );
+                    }}
+                  />
+                )}
               </View>
-            )}
-          </>
-        )}
+            ))}
+
+            <View key={ADD_SLOT_KEY} style={{ width: trackWidth }}>
+              <TouchableOpacity
+                style={styles.addSlotCard}
+                onPress={() => setAddGoalModalVisible(true)}
+              >
+                <Text style={styles.addSlotIcon}>+</Text>
+                <Text style={styles.addSlotLabel}>Add New Savings</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+
+        <View style={styles.dots}>
+          {Array.from({ length: slotCount }).map((_, i) => (
+            <TouchableOpacity key={i} onPress={() => setPage(i)}>
+              <View
+                style={[
+                  styles.dot,
+                  i === addSlotIndex && styles.dotAdd,
+                  i === pageIndex && styles.dotActive,
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
       </SafeAreaView>
+
+      <AddSavingsGoalModal
+        visible={addGoalModalVisible}
+        onSave={handleAddGoal}
+        onClose={() => setAddGoalModalVisible(false)}
+      />
     </Modal>
   );
 }
@@ -296,6 +351,7 @@ const createStyles = (theme: AppTheme) =>
       justifyContent: 'center',
     },
     closeButtonText: { fontSize: 16, color: theme.textMuted, fontWeight: '700' },
+    addButtonText: { fontSize: 20, color: theme.navy, fontWeight: '700' },
     headerTitle: { fontSize: 18, fontWeight: '800', color: theme.navy },
     emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
     emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center' },
@@ -335,6 +391,21 @@ const createStyles = (theme: AppTheme) =>
     rowTime: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
     rowAmount: { fontSize: 15, fontWeight: '700', color: theme.text },
     rowAmountWithdrawal: { color: theme.success },
+    addSlotCard: {
+      flex: 1,
+      marginHorizontal: 20,
+      marginTop: 12,
+      marginBottom: 20,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    addSlotIcon: { fontSize: 28, color: theme.textMuted, fontWeight: '700' },
+    addSlotLabel: { fontSize: 14, fontWeight: '700', color: theme.textMuted },
     dots: {
       flexDirection: 'row',
       justifyContent: 'center',
@@ -347,5 +418,6 @@ const createStyles = (theme: AppTheme) =>
       borderRadius: 3,
       backgroundColor: theme.border,
     },
-    dotActive: { backgroundColor: theme.navy },
+    dotAdd: { borderWidth: 1, borderColor: theme.textMuted, backgroundColor: 'transparent' },
+    dotActive: { backgroundColor: theme.navy, borderColor: theme.navy },
   });

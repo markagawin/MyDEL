@@ -35,6 +35,7 @@ export default function SummaryScreen() {
     totalLent,
     borrowers,
     savingsGoals,
+    addSavingsGoal,
   } = useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -330,6 +331,7 @@ export default function SummaryScreen() {
         visible={savingsVisible}
         transactions={transactions}
         savingsGoals={savingsGoals}
+        onAddSavingsGoal={addSavingsGoal}
         onClose={() => setSavingsVisible(false)}
       />
 
