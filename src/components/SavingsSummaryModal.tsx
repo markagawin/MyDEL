@@ -94,9 +94,11 @@ export default function SavingsSummaryModal({
     [transactions]
   );
 
-  // Page 0 is everything combined (the original flat view). Swiping past it reaches one page
-  // per goal (even ones with no entries yet, so a freshly created goal is visible right away),
-  // then a trailing "General Savings" page for untagged entries, then a final "add new" slot.
+  // Page 0 is everything combined (the original flat view), followed by one page per goal
+  // (even ones with no entries yet, so a freshly created goal is visible right away) and a
+  // trailing "General Savings" page for untagged entries. When there's only one such bucket,
+  // the combined view would show exactly the same numbers as that one bucket - skip it rather
+  // than show a duplicate page. A final "add new" slot always comes after the data pages.
   const pages = useMemo((): Page[] => {
     const byGoal = new Map<string, Transaction[]>();
     for (const tx of savingsTransactions) {
@@ -126,7 +128,7 @@ export default function SavingsSummaryModal({
       }))
       .sort((a, b) => b.balance - a.balance);
 
-    return [allPage, ...goalPages];
+    return goalPages.length === 1 ? goalPages : [allPage, ...goalPages];
   }, [transactions, savingsGoals, savingsTransactions]);
 
   // The swipeable track always ends in one extra "+ Add New Savings" slot after the data pages.
