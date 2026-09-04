@@ -20,6 +20,11 @@ export interface Borrower {
   name: string;
 }
 
+export interface SavingsGoal {
+  id: string;
+  name: string;
+}
+
 export interface Transaction {
   id: string;
   amount: number;
@@ -29,6 +34,7 @@ export interface Transaction {
   cycleIdentifier: string;
   recurringSourceId?: string; // set when auto-logged from a RecurringEntry
   savingsAction?: SavingsAction; // only meaningful when category === 'savings'; undefined on older entries means 'deposit'
+  savingsGoalId?: string; // only meaningful when category === 'savings'; absent means ungrouped ("General")
   paymentMethod?: PaymentMethod; // 'credit' only when charged to the card; absent/'cash' otherwise
   lendingAction?: LendingAction; // only meaningful when category === 'lending'; undefined means 'lend'
   borrowerId?: string; // only meaningful when category === 'lending'
@@ -71,4 +77,5 @@ export interface BackupData {
   profileName?: string;
   profilePhotoUri?: string | null;
   borrowers?: Borrower[];
+  savingsGoals?: SavingsGoal[];
 }

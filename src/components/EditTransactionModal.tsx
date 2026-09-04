@@ -10,7 +10,15 @@ import {
   View,
 } from 'react-native';
 import { CategoryMeta } from '../categories';
-import { Borrower, CategoryKey, LendingAction, PaymentMethod, SavingsAction, Transaction } from '../types';
+import {
+  Borrower,
+  CategoryKey,
+  LendingAction,
+  PaymentMethod,
+  SavingsAction,
+  SavingsGoal,
+  Transaction,
+} from '../types';
 import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY } from '../savings';
 import { CREDIT_CARD_CATEGORY_KEY } from '../creditCard';
@@ -19,12 +27,15 @@ import { AppTheme, useTheme } from '../theme';
 import { noWebOutline } from '../webInputStyle';
 import DatePickerModal from './DatePickerModal';
 import AddBorrowerModal from './AddBorrowerModal';
+import AddSavingsGoalModal from './AddSavingsGoalModal';
 
 interface Props {
   transaction: Transaction | null;
   categories: CategoryMeta[];
   borrowers: Borrower[];
   onAddBorrower: (name: string) => string;
+  savingsGoals: SavingsGoal[];
+  onAddSavingsGoal: (name: string) => string;
   onSave: (
     id: string,
     input: {
@@ -33,6 +44,7 @@ interface Props {
       note?: string;
       timestamp: Date;
       savingsAction?: SavingsAction;
+      savingsGoalId?: string;
       paymentMethod?: PaymentMethod;
       lendingAction?: LendingAction;
       borrowerId?: string;
@@ -46,6 +58,8 @@ export default function EditTransactionModal({
   categories,
   borrowers,
   onAddBorrower,
+  savingsGoals,
+  onAddSavingsGoal,
   onSave,
   onClose,
 }: Props) {
@@ -54,6 +68,8 @@ export default function EditTransactionModal({
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [savingsAction, setSavingsAction] = useState<SavingsAction>('deposit');
+  const [savingsGoalId, setSavingsGoalId] = useState<string | null>(null);
+  const [addSavingsGoalModalVisible, setAddSavingsGoalModalVisible] = useState(false);
   const [lendingAction, setLendingAction] = useState<LendingAction>('lend');
   const [borrowerId, setBorrowerId] = useState<string | null>(null);
   const [addBorrowerModalVisible, setAddBorrowerModalVisible] = useState(false);
@@ -67,6 +83,7 @@ export default function EditTransactionModal({
       setAmountText(String(transaction.amount));
       setCategory(transaction.category);
       setSavingsAction(transaction.savingsAction ?? 'deposit');
+      setSavingsGoalId(transaction.savingsGoalId ?? null);
       setLendingAction(transaction.lendingAction ?? 'lend');
       setBorrowerId(transaction.borrowerId ?? null);
       setCreditGateActive(
@@ -128,6 +145,7 @@ export default function EditTransactionModal({
       note: note.trim() || undefined,
       timestamp,
       savingsAction: category === SAVINGS_CATEGORY_KEY ? savingsAction : undefined,
+      savingsGoalId: category === SAVINGS_CATEGORY_KEY ? savingsGoalId ?? undefined : undefined,
       paymentMethod: isCreditPurchaseEntry ? 'credit' : undefined,
       lendingAction: isLending ? lendingAction : undefined,
       borrowerId: isLending ? borrowerId ?? undefined : undefined,
@@ -187,6 +205,7 @@ export default function EditTransactionModal({
                       }
                       setCategory(cat.key);
                       setSavingsAction('deposit');
+                      setSavingsGoalId(null);
                       setLendingAction('lend');
                       setBorrowerId(null);
                     }}
@@ -245,6 +264,39 @@ export default function EditTransactionModal({
                   </Text>
                 </TouchableOpacity>
               </View>
+            )}
+
+            {category === SAVINGS_CATEGORY_KEY && (
+              <>
+                <Text style={styles.fieldLabel}>GOAL (OPTIONAL)</Text>
+                <View style={styles.borrowerRow}>
+                  {savingsGoals.map((g) => {
+                    const selected = savingsGoalId === g.id;
+                    return (
+                      <TouchableOpacity
+                        key={g.id}
+                        style={[styles.borrowerChip, selected && styles.borrowerChipSelected]}
+                        onPress={() => setSavingsGoalId(selected ? null : g.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.borrowerChipText,
+                            selected && styles.borrowerChipTextSelected,
+                          ]}
+                        >
+                          {g.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <TouchableOpacity
+                    style={[styles.borrowerChip, styles.addBorrowerChip]}
+                    onPress={() => setAddSavingsGoalModalVisible(true)}
+                  >
+                    <Text style={styles.addBorrowerChipText}>+ Add Goal</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
 
             {isLendingCategorySelected && (
@@ -362,6 +414,12 @@ export default function EditTransactionModal({
         visible={addBorrowerModalVisible}
         onSave={(name) => setBorrowerId(onAddBorrower(name))}
         onClose={() => setAddBorrowerModalVisible(false)}
+      />
+
+      <AddSavingsGoalModal
+        visible={addSavingsGoalModalVisible}
+        onSave={(name) => setSavingsGoalId(onAddSavingsGoal(name))}
+        onClose={() => setAddSavingsGoalModalVisible(false)}
       />
     </>
   );

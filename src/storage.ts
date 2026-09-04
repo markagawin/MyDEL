@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Borrower, CustomCategory, CycleSettings, RecurringEntry, Transaction } from './types';
+import { Borrower, CustomCategory, CycleSettings, RecurringEntry, SavingsGoal, Transaction } from './types';
 
 const TRANSACTIONS_KEY = '@mydel/transactions';
 const SETTINGS_KEY = '@mydel/settings';
@@ -12,6 +12,7 @@ const PROFILE_NAME_KEY = '@mydel/profileName';
 const PROFILE_PHOTO_KEY = '@mydel/profilePhoto';
 const BANNER_VIEW_KEY = '@mydel/bannerView';
 const BORROWERS_KEY = '@mydel/borrowers';
+const SAVINGS_GOALS_KEY = '@mydel/savingsGoals';
 
 export interface BannerViewState {
   cycleIdentifier: string;
@@ -161,4 +162,18 @@ export async function loadBorrowers(): Promise<Borrower[]> {
 
 export async function saveBorrowers(borrowers: Borrower[]): Promise<void> {
   await AsyncStorage.setItem(BORROWERS_KEY, JSON.stringify(borrowers));
+}
+
+export async function loadSavingsGoals(): Promise<SavingsGoal[]> {
+  const raw = await AsyncStorage.getItem(SAVINGS_GOALS_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as SavingsGoal[];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveSavingsGoals(goals: SavingsGoal[]): Promise<void> {
+  await AsyncStorage.setItem(SAVINGS_GOALS_KEY, JSON.stringify(goals));
 }

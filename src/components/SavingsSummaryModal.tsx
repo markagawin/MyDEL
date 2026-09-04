@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
-import { Modal, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Transaction } from '../types';
+import { SavingsGoal, Transaction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, formatTimeOfDay } from '../cycleEngine';
 import { computeTotalSaved, isSavingsTransaction, savingsActionOf } from '../savings';
@@ -10,51 +10,52 @@ import { AppTheme, useTheme } from '../theme';
 interface Props {
   visible: boolean;
   transactions: Transaction[];
+  savingsGoals: SavingsGoal[];
   onClose: () => void;
 }
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const GENERAL_GOAL_KEY = '__general__';
 
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${d.getMonth()}`;
-}
-
-export default function SavingsSummaryModal({ visible, transactions, onClose }: Props) {
+export default function SavingsSummaryModal({ visible, transactions, savingsGoals, onClose }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
 
   const savingsTransactions = useMemo(
     () => transactions.filter(isSavingsTransaction),
     [transactions]
   );
 
-  const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
-
-  const sections = useMemo(() => {
-    const groups = new Map<string, { title: string; sortKey: number; data: Transaction[] }>();
+  const rows = useMemo(() => {
+    const byGoal = new Map<string, Transaction[]>();
     for (const tx of savingsTransactions) {
-      const date = new Date(tx.timestamp);
-      const key = monthKey(tx.timestamp);
-      if (!groups.has(key)) {
-        groups.set(key, {
-          title: `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`,
-          sortKey: new Date(date.getFullYear(), date.getMonth(), 1).getTime(),
-          data: [],
-        });
-      }
-      groups.get(key)!.data.push(tx);
+      const key = tx.savingsGoalId ?? GENERAL_GOAL_KEY;
+      if (!byGoal.has(key)) byGoal.set(key, []);
+      byGoal.get(key)!.push(tx);
     }
-    return Array.from(groups.values())
-      .sort((a, b) => b.sortKey - a.sortKey)
-      .map((g) => ({
-        title: g.title,
-        data: g.data.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
-      }));
-  }, [savingsTransactions]);
+
+    const named = savingsGoals
+      .filter((g) => byGoal.has(g.id))
+      .map((g) => ({ key: g.id, name: g.name, entries: byGoal.get(g.id)! }));
+    const general = byGoal.has(GENERAL_GOAL_KEY)
+      ? [{ key: GENERAL_GOAL_KEY, name: 'General Savings', entries: byGoal.get(GENERAL_GOAL_KEY)! }]
+      : [];
+
+    return [...named, ...general]
+      .map(({ key, name, entries }) => {
+        const sorted = entries.sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        const balance = sorted.reduce(
+          (sum, t) => sum + (savingsActionOf(t) === 'withdrawal' ? -t.amount : t.amount),
+          0
+        );
+        return { key, name, entries: sorted, balance };
+      })
+      .sort((a, b) => b.balance - a.balance);
+  }, [savingsGoals, savingsTransactions]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -72,37 +73,59 @@ export default function SavingsSummaryModal({ visible, transactions, onClose }: 
           <Text style={styles.totalValue}>{formatPeso(totalSaved)}</Text>
         </View>
 
-        {sections.length === 0 ? (
+        {rows.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No savings deposits or withdrawals logged yet.</Text>
           </View>
         ) : (
-          <SectionList
-            sections={sections}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-            renderSectionHeader={({ section }) => (
-              <Text style={styles.sectionHeader}>{section.title}</Text>
-            )}
-            renderItem={({ item }) => {
-              const isWithdrawal = savingsActionOf(item) === 'withdrawal';
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+            {rows.map(({ key, name, entries, balance }) => {
+              const isExpanded = expandedKey === key;
               return (
-                <View style={styles.row}>
-                  <View style={styles.rowMiddle}>
-                    <Text style={styles.rowLabel}>{isWithdrawal ? 'Withdrawal' : 'Deposit'}</Text>
-                    {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
-                    <Text style={styles.rowTime}>
-                      {formatFullDate(new Date(item.timestamp))} · {formatTimeOfDay(new Date(item.timestamp))}
-                    </Text>
+                <TouchableOpacity
+                  key={key}
+                  style={styles.goalRow}
+                  onPress={() => setExpandedKey(isExpanded ? null : key)}
+                >
+                  <View style={styles.goalTop}>
+                    <Text style={styles.goalName}>{name}</Text>
+                    <View style={styles.goalRight}>
+                      <Text style={styles.goalBalance}>{formatPeso(balance)}</Text>
+                      <Text style={styles.goalChevron}>{isExpanded ? '▾' : '▸'}</Text>
+                    </View>
                   </View>
-                  <Text style={[styles.rowAmount, isWithdrawal && styles.rowAmountWithdrawal]}>
-                    {isWithdrawal ? '− ' : '+ '}
-                    {formatPeso(item.amount)}
-                  </Text>
-                </View>
+
+                  {isExpanded && (
+                    <View style={styles.entryList}>
+                      {entries.map((tx) => {
+                        const isWithdrawal = savingsActionOf(tx) === 'withdrawal';
+                        return (
+                          <View key={tx.id} style={styles.entryRow}>
+                            <View style={styles.entryMiddle}>
+                              <Text style={styles.entryLabel}>
+                                {isWithdrawal ? 'Withdrawal' : 'Deposit'}
+                              </Text>
+                              {tx.note ? <Text style={styles.entryNote}>{tx.note}</Text> : null}
+                              <Text style={styles.entryTime}>
+                                {formatFullDate(new Date(tx.timestamp))} ·{' '}
+                                {formatTimeOfDay(new Date(tx.timestamp))}
+                              </Text>
+                            </View>
+                            <Text
+                              style={[styles.entryAmount, isWithdrawal && styles.entryAmountWithdrawal]}
+                            >
+                              {isWithdrawal ? '− ' : '+ '}
+                              {formatPeso(tx.amount)}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </TouchableOpacity>
               );
-            }}
-          />
+            })}
+          </ScrollView>
         )}
       </SafeAreaView>
     </Modal>
@@ -141,28 +164,35 @@ const createStyles = (theme: AppTheme) =>
     totalValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
     emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
     emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center' },
-    sectionHeader: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.textMuted,
-      marginTop: 14,
-      marginBottom: 6,
-      textTransform: 'uppercase',
-    },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    goalRow: {
       backgroundColor: theme.card,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: theme.border,
       padding: 14,
-      marginBottom: 8,
+      marginBottom: 10,
     },
-    rowMiddle: { flex: 1 },
-    rowLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
-    rowNote: { fontSize: 12.5, color: theme.textMuted, marginTop: 2 },
-    rowTime: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
-    rowAmount: { fontSize: 15, fontWeight: '700', color: theme.text },
-    rowAmountWithdrawal: { color: theme.success },
+    goalTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    goalName: { fontSize: 14.5, fontWeight: '700', color: theme.text },
+    goalRight: { alignItems: 'flex-end' },
+    goalBalance: { fontSize: 15, fontWeight: '700', color: theme.text },
+    goalChevron: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
+    entryList: {
+      marginTop: 12,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 8,
+    },
+    entryRow: { flexDirection: 'row', alignItems: 'center' },
+    entryMiddle: { flex: 1 },
+    entryLabel: { fontSize: 13, fontWeight: '700', color: theme.text },
+    entryNote: { fontSize: 12, color: theme.textMuted, marginTop: 1 },
+    entryTime: { fontSize: 10.5, color: theme.textMuted, marginTop: 2 },
+    entryAmount: { fontSize: 13, fontWeight: '700', color: theme.text },
+    entryAmountWithdrawal: { color: theme.success },
   });

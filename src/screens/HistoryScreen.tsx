@@ -36,6 +36,8 @@ export default function HistoryScreen() {
     updateTransaction,
     borrowers,
     addBorrower,
+    savingsGoals,
+    addSavingsGoal,
   } = useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -137,6 +139,9 @@ export default function HistoryScreen() {
             const borrowerName = isLending
               ? borrowers.find((b) => b.id === item.borrowerId)?.name
               : undefined;
+            const savingsGoalName = isSavings
+              ? savingsGoals.find((g) => g.id === item.savingsGoalId)?.name
+              : undefined;
             const isMoneyBack = isWithdrawal || isRepaid;
             return (
               <Swipeable
@@ -166,6 +171,7 @@ export default function HistoryScreen() {
                       {isCreditPurchase(item) ? ' · Credit' : ''}
                     </Text>
                     {borrowerName ? <Text style={styles.rowNote}>{borrowerName}</Text> : null}
+                    {savingsGoalName ? <Text style={styles.rowNote}>{savingsGoalName}</Text> : null}
                     {item.note ? <Text style={styles.rowNote}>{item.note}</Text> : null}
                     <Text style={styles.rowTime}>{formatTimeOfDay(new Date(item.timestamp))}</Text>
                   </View>
@@ -215,6 +221,8 @@ export default function HistoryScreen() {
         categories={categories}
         borrowers={borrowers}
         onAddBorrower={addBorrower}
+        savingsGoals={savingsGoals}
+        onAddSavingsGoal={addSavingsGoal}
         onSave={(id, input) => updateTransaction(id, input)}
         onClose={() => setEditingTransaction(null)}
       />
