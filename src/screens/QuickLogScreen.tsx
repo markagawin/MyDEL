@@ -27,6 +27,7 @@ import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
 import AddBorrowerModal from '../components/AddBorrowerModal';
+import AddSavingsGoalModal from '../components/AddSavingsGoalModal';
 import DatePickerModal from '../components/DatePickerModal';
 import Toast from '../components/Toast';
 import { noWebOutline, webPanYOnly } from '../webInputStyle';
@@ -47,12 +48,16 @@ export default function QuickLogScreen() {
     addCategory,
     borrowers,
     addBorrower,
+    savingsGoals,
+    addSavingsGoal,
     profileName,
     profilePhotoUri,
   } = useAppData();
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [savingsAction, setSavingsAction] = useState<SavingsAction>('deposit');
+  const [savingsGoalId, setSavingsGoalId] = useState<string | null>(null);
+  const [addSavingsGoalModalVisible, setAddSavingsGoalModalVisible] = useState(false);
   const [lendingAction, setLendingAction] = useState<LendingAction>('lend');
   const [borrowerId, setBorrowerId] = useState<string | null>(null);
   const [addBorrowerModalVisible, setAddBorrowerModalVisible] = useState(false);
@@ -275,6 +280,7 @@ export default function QuickLogScreen() {
     const loggedCategory = category;
     const loggedNote = note;
     const loggedSavingsAction = savingsAction;
+    const loggedSavingsGoalId = savingsGoalId;
     const loggedLendingAction = lendingAction;
     const loggedBorrowerId = borrowerId;
     const isSavings = loggedCategory === SAVINGS_CATEGORY_KEY;
@@ -302,6 +308,7 @@ export default function QuickLogScreen() {
     setAmountBlurred(false);
     setEntryDate(new Date());
     setSavingsAction('deposit');
+    setSavingsGoalId(null);
     setCreditGateActive(false);
     setLendingAction('lend');
     setBorrowerId(null);
@@ -313,6 +320,7 @@ export default function QuickLogScreen() {
       note: loggedNote,
       timestamp,
       savingsAction: isSavings ? loggedSavingsAction : undefined,
+      savingsGoalId: isSavings ? loggedSavingsGoalId ?? undefined : undefined,
       paymentMethod: isCreditPurchaseEntry ? 'credit' : undefined,
       lendingAction: isLending ? loggedLendingAction : undefined,
       borrowerId: isLending ? loggedBorrowerId ?? undefined : undefined,
@@ -514,6 +522,7 @@ export default function QuickLogScreen() {
                     }
                     setCategory(selected ? null : cat.key);
                     setSavingsAction('deposit');
+                    setSavingsGoalId(null);
                     setLendingAction('lend');
                     setBorrowerId(null);
                   }}
@@ -578,6 +587,39 @@ export default function QuickLogScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          )}
+
+          {category === SAVINGS_CATEGORY_KEY && (
+            <>
+              <Text style={styles.fieldLabelMuted}>GOAL (OPTIONAL)</Text>
+              <View style={styles.borrowerRow}>
+                {savingsGoals.map((g) => {
+                  const selected = savingsGoalId === g.id;
+                  return (
+                    <TouchableOpacity
+                      key={g.id}
+                      style={[styles.borrowerChip, selected && styles.borrowerChipSelected]}
+                      onPress={() => setSavingsGoalId(selected ? null : g.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.borrowerChipText,
+                          selected && styles.borrowerChipTextSelected,
+                        ]}
+                      >
+                        {g.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={[styles.borrowerChip, styles.addBorrowerChip]}
+                  onPress={() => setAddSavingsGoalModalVisible(true)}
+                >
+                  <Text style={styles.addBorrowerChipText}>+ Add Goal</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
 
           {isLendingCategorySelected && (
@@ -700,6 +742,12 @@ export default function QuickLogScreen() {
         visible={addBorrowerModalVisible}
         onSave={(name) => setBorrowerId(addBorrower(name))}
         onClose={() => setAddBorrowerModalVisible(false)}
+      />
+
+      <AddSavingsGoalModal
+        visible={addSavingsGoalModalVisible}
+        onSave={(name) => setSavingsGoalId(addSavingsGoal(name))}
+        onClose={() => setAddSavingsGoalModalVisible(false)}
       />
 
       <DatePickerModal

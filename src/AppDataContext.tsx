@@ -17,6 +17,7 @@ import {
   PaymentMethod,
   RecurringEntry,
   SavingsAction,
+  SavingsGoal,
   Transaction,
 } from './types';
 import { computeTotalSaved, SAVINGS_CATEGORY_KEY } from './savings';
@@ -31,6 +32,7 @@ import {
   loadProfileName,
   loadProfilePhoto,
   loadRecurringEntries,
+  loadSavingsGoals,
   loadSettings,
   loadTrackingStartDate,
   loadTransactions,
@@ -40,6 +42,7 @@ import {
   saveProfileName,
   saveProfilePhoto,
   saveRecurringEntries,
+  saveSavingsGoals,
   saveSettings,
   saveTrackingStartDate,
   saveTransactions,
@@ -69,6 +72,7 @@ interface AppDataContextValue {
   categoryMap: Record<string, CategoryMeta>;
   recurringEntries: RecurringEntry[];
   borrowers: Borrower[];
+  savingsGoals: SavingsGoal[];
   profileName: string;
   profilePhotoUri: string | null;
   setProfileName: (name: string) => Promise<void>;
@@ -79,6 +83,7 @@ interface AppDataContextValue {
     note?: string;
     timestamp?: Date;
     savingsAction?: SavingsAction;
+    savingsGoalId?: string;
     paymentMethod?: PaymentMethod;
     lendingAction?: LendingAction;
     borrowerId?: string;
@@ -92,6 +97,7 @@ interface AppDataContextValue {
       note?: string;
       timestamp?: Date;
       savingsAction?: SavingsAction;
+      savingsGoalId?: string;
       paymentMethod?: PaymentMethod;
       lendingAction?: LendingAction;
       borrowerId?: string;
@@ -106,6 +112,8 @@ interface AppDataContextValue {
   removeRecurringEntry: (id: string) => Promise<void>;
   addBorrower: (name: string) => string;
   removeBorrower: (id: string) => Promise<void>;
+  addSavingsGoal: (name: string) => string;
+  removeSavingsGoal: (id: string) => Promise<void>;
   exportBackup: () => BackupData;
   restoreFromBackup: (data: BackupData) => Promise<void>;
 }
@@ -130,6 +138,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [recurringEntries, setRecurringEntries] = useState<RecurringEntry[]>([]);
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [profileName, setProfileNameState] = useState('');
   const [profilePhotoUri, setProfilePhotoUriState] = useState<string | null>(null);
 
@@ -145,6 +154,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         storedProfileName,
         storedProfilePhoto,
         storedBorrowers,
+        storedSavingsGoals,
       ] = await Promise.all([
         loadTransactions(),
         loadSettings(),
@@ -155,6 +165,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         loadProfileName(),
         loadProfilePhoto(),
         loadBorrowers(),
+        loadSavingsGoals(),
       ]);
       setTransactions(tx);
       setSettings(s);
@@ -164,6 +175,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setProfileNameState(storedProfileName);
       setProfilePhotoUriState(storedProfilePhoto);
       setBorrowers(storedBorrowers);
+      setSavingsGoals(storedSavingsGoals);
       if (trackingStart) {
         setTrackingStartDate(trackingStart);
       } else {
@@ -196,13 +208,24 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [customCategories]);
 
   const addTransaction = useCallback<AppDataContextValue['addTransaction']>(
-    ({ amount, category, note, timestamp, savingsAction, paymentMethod, lendingAction, borrowerId }) => {
+    ({
+      amount,
+      category,
+      note,
+      timestamp,
+      savingsAction,
+      savingsGoalId,
+      paymentMethod,
+      lendingAction,
+      borrowerId,
+    }) => {
       const when = timestamp ?? new Date();
       const cycleIdentifier = timestamp
         ? clipRangeToTrackingStart(getCycleRangeForDate(when, settings), trackingStartAsDate)
             .identifier
         : currentCycleRange.identifier;
       const isLending = category === LENDING_CATEGORY_KEY;
+      const isSavings = category === SAVINGS_CATEGORY_KEY;
       const tx: Transaction = {
         id: generateId(),
         amount,
@@ -210,7 +233,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         note: note && note.trim().length > 0 ? note.trim() : undefined,
         timestamp: when.toISOString(),
         cycleIdentifier,
-        savingsAction: category === SAVINGS_CATEGORY_KEY ? savingsAction ?? 'deposit' : undefined,
+        savingsAction: isSavings ? savingsAction ?? 'deposit' : undefined,
+        savingsGoalId: isSavings ? savingsGoalId : undefined,
         paymentMethod: paymentMethod === 'credit' ? 'credit' : undefined,
         lendingAction: isLending ? lendingAction ?? 'lend' : undefined,
         borrowerId: isLending ? borrowerId : undefined,
@@ -242,6 +266,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         note?: string;
         timestamp?: Date;
         savingsAction?: SavingsAction;
+        savingsGoalId?: string;
         paymentMethod?: PaymentMethod;
         lendingAction?: LendingAction;
         borrowerId?: string;
@@ -251,13 +276,14 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         const next = prev.map((t) => {
           if (t.id !== id) return t;
           const isLending = input.category === LENDING_CATEGORY_KEY;
+          const isSavings = input.category === SAVINGS_CATEGORY_KEY;
           const updated: Transaction = {
             ...t,
             amount: input.amount,
             category: input.category,
             note: input.note && input.note.trim().length > 0 ? input.note.trim() : undefined,
-            savingsAction:
-              input.category === SAVINGS_CATEGORY_KEY ? input.savingsAction ?? 'deposit' : undefined,
+            savingsAction: isSavings ? input.savingsAction ?? 'deposit' : undefined,
+            savingsGoalId: isSavings ? input.savingsGoalId : undefined,
             paymentMethod: input.paymentMethod === 'credit' ? 'credit' : undefined,
             lendingAction: isLending ? input.lendingAction ?? 'lend' : undefined,
             borrowerId: isLending ? input.borrowerId : undefined,
@@ -457,6 +483,25 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addSavingsGoal = useCallback((name: string): string => {
+    const trimmed = name.trim();
+    const goal: SavingsGoal = { id: generateId(), name: trimmed };
+    setSavingsGoals((prev) => {
+      const next = [...prev, goal];
+      saveSavingsGoals(next);
+      return next;
+    });
+    return goal.id;
+  }, []);
+
+  const removeSavingsGoal = useCallback(async (id: string) => {
+    setSavingsGoals((prev) => {
+      const next = prev.filter((g) => g.id !== id);
+      saveSavingsGoals(next);
+      return next;
+    });
+  }, []);
+
   const setProfileName = useCallback(async (name: string) => {
     setProfileNameState(name);
     await saveProfileName(name);
@@ -480,6 +525,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       profileName,
       profilePhotoUri,
       borrowers,
+      savingsGoals,
     }),
     [
       transactions,
@@ -491,6 +537,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       profileName,
       profilePhotoUri,
       borrowers,
+      savingsGoals,
     ]
   );
 
@@ -503,6 +550,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const nextProfileName = data.profileName ?? '';
     const nextProfilePhotoUri = data.profilePhotoUri ?? null;
     const nextBorrowers = data.borrowers ?? [];
+    const nextSavingsGoals = data.savingsGoals ?? [];
 
     await Promise.all([
       saveTransactions(nextTransactions),
@@ -514,6 +562,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       nextProfilePhotoUri ? saveProfilePhoto(nextProfilePhotoUri) : Promise.resolve(),
       data.trackingStartDate ? saveTrackingStartDate(data.trackingStartDate) : Promise.resolve(),
       saveBorrowers(nextBorrowers),
+      saveSavingsGoals(nextSavingsGoals),
     ]);
 
     setTransactions(nextTransactions);
@@ -525,6 +574,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setProfilePhotoUriState(nextProfilePhotoUri);
     if (data.trackingStartDate) setTrackingStartDate(data.trackingStartDate);
     setBorrowers(nextBorrowers);
+    setSavingsGoals(nextSavingsGoals);
   }, []);
 
   const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
@@ -547,6 +597,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     categoryMap,
     recurringEntries,
     borrowers,
+    savingsGoals,
     profileName,
     profilePhotoUri,
     setProfileName,
@@ -563,6 +614,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     removeRecurringEntry,
     addBorrower,
     removeBorrower,
+    addSavingsGoal,
+    removeSavingsGoal,
     exportBackup,
     restoreFromBackup,
   };
