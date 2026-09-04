@@ -15,7 +15,7 @@ import CalendarSummaryModal from '../components/CalendarSummaryModal';
 import SavingsSummaryModal from '../components/SavingsSummaryModal';
 import LendingSummaryModal from '../components/LendingSummaryModal';
 import { isSavingsTransaction } from '../savings';
-import { isCreditCardPayment } from '../creditCard';
+import { isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
 import { CategoryKey, Transaction } from '../types';
 
@@ -78,13 +78,13 @@ export default function SummaryScreen() {
   const breakdown = useMemo(() => {
     const totals = new Map<CategoryKey, number>();
     for (const tx of transactions) {
-      // Savings and lending are transfers, not spending. A credit card payment is excluded here
-      // too — the purchase it settles is already counted under its real category (Food, Gas,
-      // etc.) via its paymentMethod tag; counting the payment as well here would double it.
+      // Savings and lending are transfers, not spending. A credit card purchase hasn't left your
+      // hand yet, so it's excluded here too — it only counts once you actually pay the card,
+      // at which point that "Pay Credit Card" entry counts under its own Credit Card category.
       if (
         !inRange(tx) ||
         isSavingsTransaction(tx) ||
-        isCreditCardPayment(tx) ||
+        isCreditPurchase(tx) ||
         isLendingTransaction(tx)
       )
         continue;
@@ -104,7 +104,9 @@ export default function SummaryScreen() {
   const entriesByCategory = useMemo(() => {
     const map = new Map<CategoryKey, Transaction[]>();
     for (const tx of transactions) {
-      if (!inRange(tx)) continue;
+      // Keep this in sync with the exclusions in `breakdown` above, so an expanded category's
+      // entries always sum to the total shown on its row.
+      if (!inRange(tx) || isCreditPurchase(tx)) continue;
       if (!map.has(tx.category)) map.set(tx.category, []);
       map.get(tx.category)!.push(tx);
     }
