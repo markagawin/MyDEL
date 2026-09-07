@@ -9,6 +9,7 @@ import React, {
 import {
   BackupData,
   Borrower,
+  BorrowAction,
   CategoryKey,
   CustomCategory,
   CycleRange,
@@ -23,6 +24,7 @@ import {
 import { computeTotalSaved, SAVINGS_CATEGORY_KEY } from './savings';
 import { computeCreditCardBalance } from './creditCard';
 import { computeLentByBorrower, computeTotalLent, LENDING_CATEGORY_KEY } from './lending';
+import { computeTotalBorrowed, BORROW_CATEGORY_KEY } from './borrow';
 import { CATEGORIES, CATEGORY_MAP, CategoryMeta } from './categories';
 import {
   DEFAULT_SETTINGS,
@@ -68,6 +70,7 @@ interface AppDataContextValue {
   creditCardBalance: number;
   totalLent: number;
   lentByBorrower: Record<string, number>;
+  totalBorrowed: number;
   categories: CategoryMeta[];
   categoryMap: Record<string, CategoryMeta>;
   recurringEntries: RecurringEntry[];
@@ -87,6 +90,7 @@ interface AppDataContextValue {
     paymentMethod?: PaymentMethod;
     lendingAction?: LendingAction;
     borrowerId?: string;
+    borrowAction?: BorrowAction;
   }) => string;
   deleteTransaction: (id: string) => Promise<void>;
   updateTransaction: (
@@ -101,6 +105,7 @@ interface AppDataContextValue {
       paymentMethod?: PaymentMethod;
       lendingAction?: LendingAction;
       borrowerId?: string;
+      borrowAction?: BorrowAction;
     }
   ) => Promise<void>;
   updateSettings: (settings: CycleSettings) => Promise<void>;
@@ -225,6 +230,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       paymentMethod,
       lendingAction,
       borrowerId,
+      borrowAction,
     }) => {
       const when = timestamp ?? new Date();
       const cycleIdentifier = timestamp
@@ -232,6 +238,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             .identifier
         : currentCycleRange.identifier;
       const isLending = category === LENDING_CATEGORY_KEY;
+      const isBorrow = category === BORROW_CATEGORY_KEY;
       const isSavings = category === SAVINGS_CATEGORY_KEY;
       const tx: Transaction = {
         id: generateId(),
@@ -244,7 +251,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         savingsGoalId: isSavings ? savingsGoalId : undefined,
         paymentMethod: paymentMethod === 'credit' ? 'credit' : undefined,
         lendingAction: isLending ? lendingAction ?? 'lend' : undefined,
-        borrowerId: isLending ? borrowerId : undefined,
+        borrowerId: isLending || isBorrow ? borrowerId : undefined,
+        borrowAction: isBorrow ? borrowAction ?? 'borrow' : undefined,
       };
       setTransactions((prev) => {
         const next = [tx, ...prev];
@@ -277,12 +285,14 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         paymentMethod?: PaymentMethod;
         lendingAction?: LendingAction;
         borrowerId?: string;
+        borrowAction?: BorrowAction;
       }
     ) => {
       setTransactions((prev) => {
         const next = prev.map((t) => {
           if (t.id !== id) return t;
           const isLending = input.category === LENDING_CATEGORY_KEY;
+          const isBorrow = input.category === BORROW_CATEGORY_KEY;
           const isSavings = input.category === SAVINGS_CATEGORY_KEY;
           const updated: Transaction = {
             ...t,
@@ -293,7 +303,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             savingsGoalId: isSavings ? input.savingsGoalId : undefined,
             paymentMethod: input.paymentMethod === 'credit' ? 'credit' : undefined,
             lendingAction: isLending ? input.lendingAction ?? 'lend' : undefined,
-            borrowerId: isLending ? input.borrowerId : undefined,
+            borrowerId: isLending || isBorrow ? input.borrowerId : undefined,
+            borrowAction: isBorrow ? input.borrowAction ?? 'borrow' : undefined,
           };
           if (input.timestamp) {
             updated.timestamp = input.timestamp.toISOString();
@@ -599,6 +610,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const creditCardBalance = useMemo(() => computeCreditCardBalance(transactions), [transactions]);
   const totalLent = useMemo(() => computeTotalLent(transactions), [transactions]);
   const lentByBorrower = useMemo(() => computeLentByBorrower(transactions), [transactions]);
+  const totalBorrowed = useMemo(() => computeTotalBorrowed(transactions), [transactions]);
 
   const value: AppDataContextValue = {
     loading,
@@ -611,6 +623,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     creditCardBalance,
     totalLent,
     lentByBorrower,
+    totalBorrowed,
     categories,
     categoryMap,
     recurringEntries,

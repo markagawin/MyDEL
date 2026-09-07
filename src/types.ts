@@ -15,6 +15,9 @@ export type PaymentMethod = 'cash' | 'credit';
 /** 'lend' is money going out to someone; 'repaid' is them paying it back. */
 export type LendingAction = 'lend' | 'repaid';
 
+/** 'borrow' is money coming in from someone; 'paid_back' is you settling it. */
+export type BorrowAction = 'borrow' | 'paid_back';
+
 export interface Borrower {
   id: string;
   name: string;
@@ -37,7 +40,8 @@ export interface Transaction {
   savingsGoalId?: string; // only meaningful when category === 'savings'; absent means ungrouped ("General")
   paymentMethod?: PaymentMethod; // 'credit' only when charged to the card; absent/'cash' otherwise
   lendingAction?: LendingAction; // only meaningful when category === 'lending'; undefined means 'lend'
-  borrowerId?: string; // only meaningful when category === 'lending'
+  borrowerId?: string; // the other person in the transaction; meaningful for 'lending' and 'borrow'
+  borrowAction?: BorrowAction; // only meaningful when category === 'borrow'; undefined means 'borrow'
 }
 
 export interface RecurringEntry {
