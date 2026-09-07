@@ -8,6 +8,7 @@ import { formatFullDate, formatTimeOfDay, sameDay, toIsoDateOnly } from '../cycl
 import { isSavingsTransaction, savingsActionOf } from '../savings';
 import { isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
+import { isBorrowTransaction } from '../borrow';
 import { AppTheme, useTheme } from '../theme';
 
 interface Props {
@@ -43,15 +44,21 @@ export default function CalendarSummaryModal({
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Savings deposits/withdrawals and lending are transfers, not spending, and a credit card
-  // purchase hasn't left your hand yet — so all three are excluded from every total here (the
-  // day cells, the month total, and the day-detail total), even though the entry itself still
-  // shows up in that day's transaction list below. A "Pay Credit Card" entry counts normally,
-  // since that's the moment the cash actually leaves.
+  // Savings deposits/withdrawals, lending, and borrowing are transfers, not spending, and a
+  // credit card purchase hasn't left your hand yet — so all four are excluded from every total
+  // here (the day cells, the month total, and the day-detail total), even though the entry itself
+  // still shows up in that day's transaction list below. A "Pay Credit Card" entry counts
+  // normally, since that's the moment the cash actually leaves.
   const totalsByDay = useMemo(() => {
     const map = new Map<string, number>();
     for (const tx of transactions) {
-      if (isSavingsTransaction(tx) || isCreditPurchase(tx) || isLendingTransaction(tx)) continue;
+      if (
+        isSavingsTransaction(tx) ||
+        isCreditPurchase(tx) ||
+        isLendingTransaction(tx) ||
+        isBorrowTransaction(tx)
+      )
+        continue;
       const key = toIsoDateOnly(new Date(tx.timestamp));
       map.set(key, (map.get(key) ?? 0) + tx.amount);
     }
@@ -100,7 +107,13 @@ export default function CalendarSummaryModal({
   const selectedDayTotal = useMemo(
     () =>
       selectedDayTransactions
-        .filter((t) => !isSavingsTransaction(t) && !isCreditPurchase(t) && !isLendingTransaction(t))
+        .filter(
+          (t) =>
+            !isSavingsTransaction(t) &&
+            !isCreditPurchase(t) &&
+            !isLendingTransaction(t) &&
+            !isBorrowTransaction(t)
+        )
         .reduce((sum, t) => sum + t.amount, 0),
     [selectedDayTransactions]
   );
@@ -114,7 +127,8 @@ export default function CalendarSummaryModal({
           t.cycleIdentifier === currentCycleRange.identifier &&
           !isSavingsTransaction(t) &&
           !isCreditPurchase(t) &&
-          !isLendingTransaction(t)
+          !isLendingTransaction(t) &&
+          !isBorrowTransaction(t)
       )
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions, currentCycleRange]);
