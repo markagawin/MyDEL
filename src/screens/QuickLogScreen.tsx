@@ -287,7 +287,7 @@ export default function QuickLogScreen() {
       }
       if (cat.key === LENDING_CATEGORY_KEY) {
         items.push({ kind: 'lendAction', action: 'lend', label: 'Lend', icon: '🤝' });
-        items.push({ kind: 'lendAction', action: 'repaid', label: 'Repay', icon: '💰' });
+        items.push({ kind: 'lendAction', action: 'repaid', label: 'Repay', icon: '💵' });
         continue;
       }
       items.push({ kind: 'category', cat });
