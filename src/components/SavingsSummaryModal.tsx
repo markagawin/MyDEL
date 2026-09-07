@@ -148,6 +148,10 @@ export default function SavingsSummaryModal({
 
   const selected = accounts.find((a) => a.key === selectedKey) ?? accounts[0];
 
+  // What "All" shows instead of a merged transaction log: every real account by name, tap one
+  // to switch straight to it (same effect as tapping its box above).
+  const accountList = accounts.filter((a) => a.key !== ALL_KEY);
+
   // Reset to "All" whenever the modal is reopened, so it doesn't reopen on whatever
   // account happened to be picked last time.
   useEffect(() => {
@@ -262,13 +266,31 @@ export default function SavingsSummaryModal({
         </ScrollView>
 
         <View style={styles.listArea}>
-          {selected.sections.length === 0 ? (
+          {selected.key === ALL_KEY ? (
+            accountList.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No savings deposits or withdrawals logged yet.</Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+                {accountList.map((a) => (
+                  <TouchableOpacity
+                    key={a.key}
+                    style={styles.accountListRow}
+                    onPress={() => setSelectedKey(a.key)}
+                  >
+                    <Text style={styles.accountListLabel}>{a.label}</Text>
+                    <View style={styles.accountListRight}>
+                      <Text style={styles.accountListBalance}>{formatPeso(a.balance)}</Text>
+                      <Text style={styles.accountListChevron}>▸</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )
+          ) : selected.sections.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>
-                {selected.key === ALL_KEY
-                  ? 'No savings deposits or withdrawals logged yet.'
-                  : 'Nothing logged for this account yet.'}
-              </Text>
+              <Text style={styles.emptyText}>Nothing logged for this account yet.</Text>
             </View>
           ) : (
             <SectionList
@@ -411,6 +433,21 @@ const createStyles = (theme: AppTheme) =>
     addBoxIcon: { fontSize: 18, color: theme.textMuted, fontWeight: '700' },
     addBoxLabel: { fontSize: 11.5, fontWeight: '700', color: theme.textMuted, marginTop: 2 },
     listArea: { flex: 1 },
+    accountListRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: 16,
+      marginBottom: 10,
+    },
+    accountListLabel: { fontSize: 14.5, fontWeight: '700', color: theme.text },
+    accountListRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    accountListBalance: { fontSize: 14.5, fontWeight: '700', color: theme.text },
+    accountListChevron: { fontSize: 13, color: theme.textMuted },
     emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
     emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center' },
     sectionHeader: {
