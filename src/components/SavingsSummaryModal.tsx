@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Dimensions,
   Modal,
   ScrollView,
   SectionList,
@@ -158,6 +159,54 @@ export default function SavingsSummaryModal({
     if (visible) setSelectedKey(ALL_KEY);
   }, [visible]);
 
+  // Keep the newly-selected box in view in the picker row - whether selection changed by
+  // tapping a box directly, tapping a name in the "All" list, or creating/renaming a goal -
+  // instead of leaving the user to manually swipe over and find it themselves. The container's
+  // own onLayout doesn't fire reliably here on web, so its width is approximated from the
+  // screen width instead (the row spans the full-width modal with no side margins) - each box's
+  // onLayout, which does fire reliably, still gives the real per-box x/width.
+  const accountScrollRef = useRef<ScrollView>(null);
+  const accountScrollXRef = useRef(0);
+  const boxLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
+  // A box's onLayout can fire late (most notably each box's very first, at-mount measurement),
+  // arriving after the user has already moved on to a different selection. Reading the
+  // selection from a ref rather than the value closed over at render time keeps that late
+  // callback from re-triggering a scroll back to whatever was selected when it was scheduled.
+  const selectedKeyRef = useRef(selectedKey);
+  selectedKeyRef.current = selectedKey;
+
+  // A box's real onLayout measurement isn't always in yet by the moment selection changes
+  // (most likely for one further along the row, measured later than earlier ones). Fall back
+  // to an estimated position from its index so the scroll still happens - approximate is fine,
+  // it only has to get the box roughly into view, not pixel-perfect.
+  const ESTIMATED_BOX_WIDTH = 150;
+
+  const scrollAccountIntoView = (key: string) => {
+    if (key !== selectedKeyRef.current) return;
+    const measured = boxLayoutsRef.current[key];
+    const index = accounts.findIndex((a) => a.key === key);
+    const layout = measured ?? (index >= 0 ? { x: index * ESTIMATED_BOX_WIDTH, width: ESTIMATED_BOX_WIDTH } : null);
+    if (!layout) return;
+    const viewportWidth = Dimensions.get('window').width;
+    const padding = 12;
+    const visibleLeft = accountScrollXRef.current;
+    const visibleRight = visibleLeft + viewportWidth;
+    let target: number | null = null;
+    if (layout.x < visibleLeft) {
+      target = Math.max(0, layout.x - padding);
+    } else if (layout.x + layout.width > visibleRight) {
+      target = Math.max(0, layout.x + layout.width - viewportWidth + padding);
+    }
+    if (target !== null) {
+      accountScrollRef.current?.scrollTo({ x: target, animated: true });
+    }
+  };
+
+  useEffect(() => {
+    scrollAccountIntoView(selectedKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey]);
+
   const handleSaveGoal = (name: string) => {
     if (editingGoal) {
       onRenameSavingsGoal(editingGoal.id, name);
@@ -212,10 +261,15 @@ export default function SavingsSummaryModal({
         </View>
 
         <ScrollView
+          ref={accountScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.accountScroll}
           contentContainerStyle={styles.accountRow}
+          onScroll={(e) => {
+            accountScrollXRef.current = e.nativeEvent.contentOffset.x;
+          }}
+          scrollEventThrottle={16}
         >
           {accounts.map((a) => {
             const isSelected = a.key === selected.key;
@@ -227,6 +281,13 @@ export default function SavingsSummaryModal({
                   a.isGoal && styles.accountBoxWithRemove,
                   isSelected && styles.accountBoxSelected,
                 ]}
+                onLayout={(e) => {
+                  boxLayoutsRef.current[a.key] = {
+                    x: e.nativeEvent.layout.x,
+                    width: e.nativeEvent.layout.width,
+                  };
+                  scrollAccountIntoView(a.key);
+                }}
                 onPress={() => setSelectedKey(a.key)}
               >
                 {a.isGoal && (
