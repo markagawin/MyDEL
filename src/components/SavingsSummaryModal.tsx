@@ -22,6 +22,7 @@ interface Props {
   transactions: Transaction[];
   savingsGoals: SavingsGoal[];
   onAddSavingsGoal: (name: string) => string;
+  onRenameSavingsGoal: (id: string, name: string) => void;
   onRemoveSavingsGoal: (id: string) => void;
   onClose: () => void;
 }
@@ -84,12 +85,14 @@ export default function SavingsSummaryModal({
   transactions,
   savingsGoals,
   onAddSavingsGoal,
+  onRenameSavingsGoal,
   onRemoveSavingsGoal,
   onClose,
 }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [addGoalModalVisible, setAddGoalModalVisible] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [selectedKey, setSelectedKey] = useState<string>(ALL_KEY);
   const [pendingRemoveGoal, setPendingRemoveGoal] = useState<SavingsGoal | null>(null);
 
@@ -100,10 +103,9 @@ export default function SavingsSummaryModal({
 
   const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
 
-  // "All" is the original flat view (everything combined), followed by one account per goal
-  // (even ones with no entries yet, so a freshly created goal is pickable right away) and a
-  // trailing "General Savings" account for untagged entries. A transaction whose goal was since
-  // deleted falls back into General too, rather than vanishing from every account.
+  // "All" is the original flat view (everything combined). "General Savings" (untagged entries,
+  // including ones whose goal was since deleted) always comes right after it, ahead of the named
+  // goals - it's the default bucket, so it stays first among the real accounts.
   const accounts = useMemo((): Account[] => {
     const validGoalIds = new Set(savingsGoals.map((g) => g.id));
     const byGoal = new Map<string, Transaction[]>();
@@ -132,7 +134,7 @@ export default function SavingsSummaryModal({
       ? [{ key: GENERAL_GOAL_KEY, label: 'General Savings', entries: byGoal.get(GENERAL_GOAL_KEY)!, isGoal: false }]
       : [];
 
-    const goalAccounts = [...named, ...general].map(({ key, label, entries, isGoal }) => ({
+    const goalAccounts = [...general, ...named].map(({ key, label, entries, isGoal }) => ({
       key,
       label,
       balance: balanceOf(entries),
@@ -152,9 +154,24 @@ export default function SavingsSummaryModal({
     if (visible) setSelectedKey(ALL_KEY);
   }, [visible]);
 
-  const handleAddGoal = (name: string) => {
-    const id = onAddSavingsGoal(name);
-    setSelectedKey(id);
+  const handleSaveGoal = (name: string) => {
+    if (editingGoal) {
+      onRenameSavingsGoal(editingGoal.id, name);
+      setEditingGoal(null);
+    } else {
+      const id = onAddSavingsGoal(name);
+      setSelectedKey(id);
+    }
+  };
+
+  const openAddGoal = () => {
+    setEditingGoal(null);
+    setAddGoalModalVisible(true);
+  };
+
+  const openRenameGoal = (goal: SavingsGoal) => {
+    setEditingGoal(goal);
+    setAddGoalModalVisible(true);
   };
 
   const handleConfirmRemove = () => {
@@ -178,7 +195,7 @@ export default function SavingsSummaryModal({
           <Text style={styles.headerTitle}>Savings</Text>
           <TouchableOpacity
             accessibilityLabel="Add new savings"
-            onPress={() => setAddGoalModalVisible(true)}
+            onPress={openAddGoal}
             style={styles.closeButton}
           >
             <Text style={styles.addButtonText}>+</Text>
@@ -209,13 +226,22 @@ export default function SavingsSummaryModal({
                 onPress={() => setSelectedKey(a.key)}
               >
                 {a.isGoal && (
-                  <TouchableOpacity
-                    accessibilityLabel={`Remove ${a.label}`}
-                    style={styles.accountRemoveButton}
-                    onPress={() => setPendingRemoveGoal({ id: a.key, name: a.label })}
-                  >
-                    <Text style={styles.accountRemoveIcon}>🗑️</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity
+                      accessibilityLabel={`Rename ${a.label}`}
+                      style={styles.accountRenameButton}
+                      onPress={() => openRenameGoal({ id: a.key, name: a.label })}
+                    >
+                      <Text style={styles.accountActionIcon}>✏️</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityLabel={`Remove ${a.label}`}
+                      style={styles.accountRemoveButton}
+                      onPress={() => setPendingRemoveGoal({ id: a.key, name: a.label })}
+                    >
+                      <Text style={styles.accountActionIcon}>🗑️</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
                 <Text style={[styles.accountLabel, isSelected && styles.accountLabelSelected]}>
                   {a.label}
@@ -228,7 +254,7 @@ export default function SavingsSummaryModal({
           })}
           <TouchableOpacity
             style={[styles.accountBox, styles.addBox]}
-            onPress={() => setAddGoalModalVisible(true)}
+            onPress={openAddGoal}
           >
             <Text style={styles.addBoxIcon}>+</Text>
             <Text style={styles.addBoxLabel}>Add New</Text>
@@ -277,7 +303,8 @@ export default function SavingsSummaryModal({
 
       <AddSavingsGoalModal
         visible={addGoalModalVisible}
-        onSave={handleAddGoal}
+        editingGoal={editingGoal}
+        onSave={handleSaveGoal}
         onClose={() => setAddGoalModalVisible(false)}
       />
 
@@ -351,11 +378,20 @@ const createStyles = (theme: AppTheme) =>
       paddingVertical: 10,
       marginRight: 10,
     },
-    accountBoxWithRemove: { paddingRight: 26 },
+    accountBoxWithRemove: { paddingRight: 46 },
     accountBoxSelected: { backgroundColor: theme.navy, borderColor: theme.navy },
     accountLabel: { fontSize: 12.5, fontWeight: '700', color: theme.text },
     accountLabelSelected: { color: '#FFFFFF' },
     accountBalance: { fontSize: 13.5, fontWeight: '800', color: theme.text, marginTop: 3 },
+    accountRenameButton: {
+      position: 'absolute',
+      top: 4,
+      right: 24,
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     accountRemoveButton: {
       position: 'absolute',
       top: 4,
@@ -365,7 +401,7 @@ const createStyles = (theme: AppTheme) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    accountRemoveIcon: { fontSize: 11 },
+    accountActionIcon: { fontSize: 11 },
     addBox: {
       borderStyle: 'dashed',
       backgroundColor: theme.background,
