@@ -130,6 +130,12 @@ function slugify(label: string): string {
   return slug || 'category';
 }
 
+/** Capitalizes just the first character, leaving the rest of the casing as typed - so "car"
+ * becomes "Car" but "iPhone" isn't flattened to "Iphone". */
+function capitalizeFirst(label: string): string {
+  return label.length === 0 ? label : label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -485,7 +491,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addSavingsGoal = useCallback((name: string): string => {
-    const trimmed = name.trim();
+    const trimmed = capitalizeFirst(name.trim());
     const goal: SavingsGoal = { id: generateId(), name: trimmed };
     setSavingsGoals((prev) => {
       const next = [...prev, goal];
@@ -496,7 +502,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const renameSavingsGoal = useCallback(async (id: string, name: string) => {
-    const trimmed = name.trim();
+    const trimmed = capitalizeFirst(name.trim());
     if (!trimmed) return;
     setSavingsGoals((prev) => {
       // The id stays fixed so existing transactions tagged with it keep resolving correctly.
