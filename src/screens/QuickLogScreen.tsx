@@ -16,7 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
-import { BorrowAction, CategoryKey, LendingAction, SavingsAction } from '../types';
+import { CategoryKey, LendingAction, SavingsAction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
@@ -28,6 +28,7 @@ import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
 import AddBorrowerModal from '../components/AddBorrowerModal';
+import BorrowEntryModal, { BorrowEntrySubmission } from '../components/BorrowEntryModal';
 import AddSavingsGoalModal from '../components/AddSavingsGoalModal';
 import DatePickerModal from '../components/DatePickerModal';
 import Toast from '../components/Toast';
@@ -60,9 +61,9 @@ export default function QuickLogScreen() {
   const [savingsGoalId, setSavingsGoalId] = useState<string | null>(null);
   const [addSavingsGoalModalVisible, setAddSavingsGoalModalVisible] = useState(false);
   const [lendingAction, setLendingAction] = useState<LendingAction>('lend');
-  const [borrowAction, setBorrowAction] = useState<BorrowAction>('borrow');
   const [borrowerId, setBorrowerId] = useState<string | null>(null);
   const [addBorrowerModalVisible, setAddBorrowerModalVisible] = useState(false);
+  const [borrowModalVisible, setBorrowModalVisible] = useState(false);
   // True once the Credit Card tile has been tapped from the top-level grid — swaps the grid to
   // "what was this for" (real categories + a Pay Credit Card option) so a credit purchase is
   // always explicitly tied to a real category, never left as a bare "Credit Card" entry.
@@ -247,13 +248,17 @@ export default function QuickLogScreen() {
   }, [transactions]);
 
   // Once the Credit Card gate is active, the grid swaps to "what was this for": real categories
-  // only (Savings and the Credit Card tile itself don't make sense as a credit purchase), plus a
-  // relabeled Credit Card tile that now means "log this as a card payment instead".
+  // only (Savings, Borrow, and the Credit Card tile itself don't make sense as a credit
+  // purchase), plus a relabeled Credit Card tile that now means "log this as a card payment
+  // instead".
   const visibleCategories = useMemo(() => {
     if (!creditGateActive) return categories;
     const creditCardMeta = categories.find((c) => c.key === CREDIT_CARD_CATEGORY_KEY);
     const realCategories = categories.filter(
-      (c) => c.key !== SAVINGS_CATEGORY_KEY && c.key !== CREDIT_CARD_CATEGORY_KEY
+      (c) =>
+        c.key !== SAVINGS_CATEGORY_KEY &&
+        c.key !== CREDIT_CARD_CATEGORY_KEY &&
+        c.key !== BORROW_CATEGORY_KEY
     );
     return creditCardMeta
       ? [...realCategories, { ...creditCardMeta, label: 'Pay Credit Card' }]
@@ -278,12 +283,8 @@ export default function QuickLogScreen() {
   const amountValue = parseFloat(amountText);
   const hasValidAmount = !Number.isNaN(amountValue) && amountValue > 0;
   const isLendingCategorySelected = category === LENDING_CATEGORY_KEY;
-  const isBorrowCategorySelected = category === BORROW_CATEGORY_KEY;
   const canLog =
-    hasValidAmount &&
-    category !== null &&
-    (!isLendingCategorySelected || borrowerId !== null) &&
-    (!isBorrowCategorySelected || borrowerId !== null);
+    hasValidAmount && category !== null && (!isLendingCategorySelected || borrowerId !== null);
   const showCategoryPrompt = amountBlurred && hasValidAmount && category === null;
 
   const handleLog = () => {
@@ -294,11 +295,9 @@ export default function QuickLogScreen() {
     const loggedSavingsAction = savingsAction;
     const loggedSavingsGoalId = savingsGoalId;
     const loggedLendingAction = lendingAction;
-    const loggedBorrowAction = borrowAction;
     const loggedBorrowerId = borrowerId;
     const isSavings = loggedCategory === SAVINGS_CATEGORY_KEY;
     const isLending = loggedCategory === LENDING_CATEGORY_KEY;
-    const isBorrow = loggedCategory === BORROW_CATEGORY_KEY;
     const isCreditCardPaymentEntry = loggedCategory === CREDIT_CARD_CATEGORY_KEY;
     // Reached the credit gate and picked a real category: this is a purchase charged to the
     // card. Picking "Pay Credit Card" itself (loggedCategory === CREDIT_CARD_CATEGORY_KEY) is a
@@ -325,7 +324,6 @@ export default function QuickLogScreen() {
     setSavingsGoalId(null);
     setCreditGateActive(false);
     setLendingAction('lend');
-    setBorrowAction('borrow');
     setBorrowerId(null);
     amountInputRef.current?.blur();
 
@@ -338,12 +336,10 @@ export default function QuickLogScreen() {
       savingsGoalId: isSavings ? loggedSavingsGoalId ?? undefined : undefined,
       paymentMethod: isCreditPurchaseEntry ? 'credit' : undefined,
       lendingAction: isLending ? loggedLendingAction : undefined,
-      borrowerId: isLending || isBorrow ? loggedBorrowerId ?? undefined : undefined,
-      borrowAction: isBorrow ? loggedBorrowAction : undefined,
+      borrowerId: isLending ? loggedBorrowerId ?? undefined : undefined,
     });
 
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToastMessage(
+    showToast(
       isSavings
         ? loggedSavingsAction === 'withdrawal'
           ? `${formatPeso(loggedAmount)} withdrawn from savings`
@@ -352,22 +348,54 @@ export default function QuickLogScreen() {
           ? loggedLendingAction === 'repaid'
             ? `${formatPeso(loggedAmount)} repaid by ${borrowerName}`
             : `${formatPeso(loggedAmount)} lent to ${borrowerName}`
-          : isBorrow
-            ? loggedBorrowAction === 'paid_back'
-              ? `${formatPeso(loggedAmount)} paid back to ${borrowerName}`
-              : `${formatPeso(loggedAmount)} borrowed from ${borrowerName}`
-            : isCreditCardPaymentEntry
-              ? `${formatPeso(loggedAmount)} paid toward credit card`
-              : isCreditPurchaseEntry
-                ? `${formatPeso(loggedAmount)} charged to credit card`
-                : `${formatPeso(loggedAmount)} added successfully`
+          : isCreditCardPaymentEntry
+            ? `${formatPeso(loggedAmount)} paid toward credit card`
+            : isCreditPurchaseEntry
+              ? `${formatPeso(loggedAmount)} charged to credit card`
+              : `${formatPeso(loggedAmount)} added successfully`,
+      newId
     );
-    setToastUndoId(newId);
+  };
+
+  // Shared by handleLog and the Borrow popup's submit — shows the success toast with undo.
+  const showToast = (message: string, transactionId: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(message);
+    setToastUndoId(transactionId);
     setToastVisible(true);
     toastTimeoutRef.current = setTimeout(() => {
       setToastVisible(false);
       setToastUndoId(null);
     }, 2200);
+  };
+
+  const handleBorrowSubmit = (data: BorrowEntrySubmission) => {
+    const borrowerName = borrowers.find((b) => b.id === data.borrowerId)?.name ?? 'them';
+    const now = new Date();
+    const timestamp = new Date(
+      data.date.getFullYear(),
+      data.date.getMonth(),
+      data.date.getDate(),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    );
+    const newId = addTransaction({
+      amount: data.amount,
+      category: BORROW_CATEGORY_KEY,
+      note: data.note,
+      timestamp,
+      borrowerId: data.borrowerId,
+      borrowAction: data.borrowAction,
+    });
+    setBorrowModalVisible(false);
+    showToast(
+      data.borrowAction === 'paid_back'
+        ? `${formatPeso(data.amount)} paid back to ${borrowerName}`
+        : `${formatPeso(data.amount)} borrowed from ${borrowerName}`,
+      newId
+    );
   };
 
   const handleUndo = () => {
@@ -540,11 +568,16 @@ export default function QuickLogScreen() {
                       setCategory(null);
                       return;
                     }
+                    // Borrow uses its own guided popup instead of the inline amount-first flow —
+                    // it never becomes the selected category on this screen.
+                    if (cat.key === BORROW_CATEGORY_KEY) {
+                      setBorrowModalVisible(true);
+                      return;
+                    }
                     setCategory(selected ? null : cat.key);
                     setSavingsAction('deposit');
                     setSavingsGoalId(null);
                     setLendingAction('lend');
-                    setBorrowAction('borrow');
                     setBorrowerId(null);
                   }}
                   style={[
@@ -711,74 +744,6 @@ export default function QuickLogScreen() {
             </>
           )}
 
-          {isBorrowCategorySelected && (
-            <>
-              <View style={styles.savingsToggleRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.savingsToggleOption,
-                    borrowAction === 'borrow' && styles.savingsToggleOptionActive,
-                  ]}
-                  onPress={() => setBorrowAction('borrow')}
-                >
-                  <Text
-                    style={[
-                      styles.savingsToggleText,
-                      borrowAction === 'borrow' && styles.savingsToggleTextActive,
-                    ]}
-                  >
-                    Borrow
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.savingsToggleOption,
-                    borrowAction === 'paid_back' && styles.savingsToggleOptionActive,
-                  ]}
-                  onPress={() => setBorrowAction('paid_back')}
-                >
-                  <Text
-                    style={[
-                      styles.savingsToggleText,
-                      borrowAction === 'paid_back' && styles.savingsToggleTextActive,
-                    ]}
-                  >
-                    Paid Back
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.fieldLabelMuted}>PERSON</Text>
-              <View style={styles.borrowerRow}>
-                {borrowers.map((b) => {
-                  const selected = borrowerId === b.id;
-                  return (
-                    <TouchableOpacity
-                      key={b.id}
-                      style={[styles.borrowerChip, selected && styles.borrowerChipSelected]}
-                      onPress={() => setBorrowerId(b.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.borrowerChipText,
-                          selected && styles.borrowerChipTextSelected,
-                        ]}
-                      >
-                        {b.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                <TouchableOpacity
-                  style={[styles.borrowerChip, styles.addBorrowerChip]}
-                  onPress={() => setAddBorrowerModalVisible(true)}
-                >
-                  <Text style={styles.addBorrowerChipText}>+ Add Person</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
           <Text style={styles.fieldLabelMuted}>NOTE (OPTIONAL)</Text>
           <View style={styles.noteWrap}>
             <Text style={styles.noteIcon}>📝</Text>
@@ -831,6 +796,14 @@ export default function QuickLogScreen() {
         visible={addBorrowerModalVisible}
         onSave={(name) => setBorrowerId(addBorrower(name))}
         onClose={() => setAddBorrowerModalVisible(false)}
+      />
+
+      <BorrowEntryModal
+        visible={borrowModalVisible}
+        borrowers={borrowers}
+        onAddBorrower={addBorrower}
+        onSubmit={handleBorrowSubmit}
+        onClose={() => setBorrowModalVisible(false)}
       />
 
       <AddSavingsGoalModal
