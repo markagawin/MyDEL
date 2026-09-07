@@ -66,6 +66,7 @@ interface AppDataContextValue {
   currentCycleRange: CycleRange;
   currentCycleIdentifier: string;
   currentPaycheck: number | null;
+  paychecks: Record<string, number>;
   totalSaved: number;
   creditCardBalance: number;
   totalLent: number;
@@ -619,6 +620,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     currentCycleRange,
     currentCycleIdentifier: currentCycleRange.identifier,
     currentPaycheck: paychecks[currentCycleRange.identifier] ?? null,
+    paychecks,
     totalSaved,
     creditCardBalance,
     totalLent,

@@ -16,6 +16,7 @@ import SavingsSummaryModal from '../components/SavingsSummaryModal';
 import LendingSummaryModal from '../components/LendingSummaryModal';
 import CreditCardSummaryModal from '../components/CreditCardSummaryModal';
 import BorrowSummaryModal from '../components/BorrowSummaryModal';
+import CycleHistoryModal from '../components/CycleHistoryModal';
 import { isSavingsTransaction } from '../savings';
 import { isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
@@ -41,6 +42,7 @@ export default function SummaryScreen() {
     addSavingsGoal,
     renameSavingsGoal,
     removeSavingsGoal,
+    paychecks,
   } = useAppData();
   const [selectedCycle, setSelectedCycle] = useState<string>(currentCycleIdentifier);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -51,6 +53,7 @@ export default function SummaryScreen() {
   const [lendingVisible, setLendingVisible] = useState(false);
   const [creditCardVisible, setCreditCardVisible] = useState(false);
   const [borrowVisible, setBorrowVisible] = useState(false);
+  const [cycleHistoryVisible, setCycleHistoryVisible] = useState(false);
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
 
@@ -147,6 +150,13 @@ export default function SummaryScreen() {
               <View style={styles.calendarIcon}>
                 <View style={styles.calendarIconHeader} />
               </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel="Cycle history"
+              style={styles.calendarButton}
+              onPress={() => setCycleHistoryVisible(true)}
+            >
+              <Text style={styles.gearIcon}>🗄️</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityLabel="Settings"
@@ -372,6 +382,14 @@ export default function SummaryScreen() {
         transactions={transactions}
         borrowers={borrowers}
         onClose={() => setBorrowVisible(false)}
+      />
+
+      <CycleHistoryModal
+        visible={cycleHistoryVisible}
+        transactions={transactions}
+        currentCycleRange={currentCycleRange}
+        paychecks={paychecks}
+        onClose={() => setCycleHistoryVisible(false)}
       />
     </SafeAreaView>
   );
