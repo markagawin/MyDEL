@@ -16,7 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
-import { BorrowAction, CategoryKey, LendingAction, SavingsAction } from '../types';
+import { CategoryKey, SavingsAction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
@@ -33,16 +33,6 @@ import AddSavingsGoalModal from '../components/AddSavingsGoalModal';
 import DatePickerModal from '../components/DatePickerModal';
 import Toast from '../components/Toast';
 import { noWebOutline, webPanYOnly } from '../webInputStyle';
-import { CategoryMeta } from '../categories';
-
-// The grid renders one tile per category, except Borrow and Lending: each expands into two
-// direction-specific tiles (Borrow/Payback, Lend/Repay) so tapping one launches its popup
-// pre-set to that direction — no in-popup step to pick it.
-type GridItem =
-  | { kind: 'category'; cat: CategoryMeta }
-  | { kind: 'borrowAction'; action: BorrowAction; label: string; icon: string }
-  | { kind: 'lendAction'; action: LendingAction; label: string; icon: string };
-
 export default function QuickLogScreen() {
   const navigation = useNavigation<any>();
   const theme = useTheme();
@@ -70,9 +60,7 @@ export default function QuickLogScreen() {
   const [savingsGoalId, setSavingsGoalId] = useState<string | null>(null);
   const [addSavingsGoalModalVisible, setAddSavingsGoalModalVisible] = useState(false);
   const [borrowModalVisible, setBorrowModalVisible] = useState(false);
-  const [borrowModalAction, setBorrowModalAction] = useState<BorrowAction>('borrow');
   const [lendingModalVisible, setLendingModalVisible] = useState(false);
-  const [lendingModalAction, setLendingModalAction] = useState<LendingAction>('lend');
   // True once the Credit Card tile has been tapped from the top-level grid — swaps the grid to
   // "what was this for" (real categories + a Pay Credit Card option) so a credit purchase is
   // always explicitly tied to a real category, never left as a bare "Credit Card" entry.
@@ -275,26 +263,6 @@ export default function QuickLogScreen() {
       : realCategories;
   }, [categories, creditGateActive]);
 
-  // Expand Borrow and Lending into their direction-specific tiles. During the credit gate,
-  // visibleCategories never contains them in the first place, so this is a no-op there.
-  const gridItems = useMemo<GridItem[]>(() => {
-    const items: GridItem[] = [];
-    for (const cat of visibleCategories) {
-      if (cat.key === BORROW_CATEGORY_KEY) {
-        items.push({ kind: 'borrowAction', action: 'borrow', label: 'Borrow', icon: '📥' });
-        items.push({ kind: 'borrowAction', action: 'paid_back', label: 'Payback', icon: '💸' });
-        continue;
-      }
-      if (cat.key === LENDING_CATEGORY_KEY) {
-        items.push({ kind: 'lendAction', action: 'lend', label: 'Lend', icon: '🤝' });
-        items.push({ kind: 'lendAction', action: 'repaid', label: 'Repay', icon: '💵' });
-        continue;
-      }
-      items.push({ kind: 'category', cat });
-    }
-    return items;
-  }, [visibleCategories]);
-
   // The grid is 4 tiles per row with justifyContent: 'space-between', which spaces a
   // *partial* last row differently depending on how many tiles are in it (1 tile sits at the
   // left, 3 tiles spread edge-to-edge, etc.) — so the layout visibly jumps whenever the tile
@@ -302,9 +270,9 @@ export default function QuickLogScreen() {
   // multiple of 4 with invisible filler tiles gives space-between a full row to distribute
   // every time, which keeps the real tiles consistently left-anchored regardless of count.
   const gridFillerCount = useMemo(() => {
-    const totalTiles = gridItems.length + (creditGateActive ? 0 : 1); // +1 for Add tile
+    const totalTiles = visibleCategories.length + (creditGateActive ? 0 : 1); // +1 for Add tile
     return (4 - (totalTiles % 4)) % 4;
-  }, [gridItems.length, creditGateActive]);
+  }, [visibleCategories.length, creditGateActive]);
 
   const remaining = currentPaycheck !== null ? currentPaycheck - periodTotal : null;
   const pctSpent =
@@ -602,38 +570,7 @@ export default function QuickLogScreen() {
           )}
 
           <View style={styles.grid}>
-            {gridItems.map((item) => {
-              if (item.kind === 'borrowAction') {
-                return (
-                  <Pressable
-                    key={`borrow-${item.action}`}
-                    onPress={() => {
-                      setBorrowModalAction(item.action);
-                      setBorrowModalVisible(true);
-                    }}
-                    style={styles.tile}
-                  >
-                    <Text style={styles.tileIcon}>{item.icon}</Text>
-                    <Text style={styles.tileLabel}>{item.label}</Text>
-                  </Pressable>
-                );
-              }
-              if (item.kind === 'lendAction') {
-                return (
-                  <Pressable
-                    key={`lend-${item.action}`}
-                    onPress={() => {
-                      setLendingModalAction(item.action);
-                      setLendingModalVisible(true);
-                    }}
-                    style={styles.tile}
-                  >
-                    <Text style={styles.tileIcon}>{item.icon}</Text>
-                    <Text style={styles.tileLabel}>{item.label}</Text>
-                  </Pressable>
-                );
-              }
-              const cat = item.cat;
+            {visibleCategories.map((cat) => {
               const selected = category === cat.key;
               return (
                 <Pressable
@@ -642,6 +579,16 @@ export default function QuickLogScreen() {
                     if (cat.key === CREDIT_CARD_CATEGORY_KEY && !creditGateActive) {
                       setCreditGateActive(true);
                       setCategory(null);
+                      return;
+                    }
+                    // Borrow and Lending each use their own guided popup instead of the inline
+                    // amount-first flow — neither ever becomes the selected category here.
+                    if (cat.key === BORROW_CATEGORY_KEY) {
+                      setBorrowModalVisible(true);
+                      return;
+                    }
+                    if (cat.key === LENDING_CATEGORY_KEY) {
+                      setLendingModalVisible(true);
                       return;
                     }
                     setCategory(selected ? null : cat.key);
@@ -794,7 +741,6 @@ export default function QuickLogScreen() {
 
       <BorrowEntryModal
         visible={borrowModalVisible}
-        action={borrowModalAction}
         borrowers={borrowers}
         onAddBorrower={addBorrower}
         onSubmit={handleBorrowSubmit}
@@ -803,7 +749,6 @@ export default function QuickLogScreen() {
 
       <LendingEntryModal
         visible={lendingModalVisible}
-        action={lendingModalAction}
         borrowers={borrowers}
         onAddBorrower={addBorrower}
         onSubmit={handleLendingSubmit}

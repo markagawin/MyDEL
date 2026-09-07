@@ -14,9 +14,9 @@ export const CATEGORIES: CategoryMeta[] = [
   { key: 'gas', label: 'Gas', icon: '⛽', color: '#EF4444' },
   { key: 'bills', label: 'Bills', icon: '💡', color: '#F59E0B' },
   { key: 'creditCard', label: 'Credit Card', icon: '💳', color: '#EC4899' },
-  { key: 'borrow', label: 'Borrow', icon: '📥', color: '#6366F1' },
+  { key: 'borrow', label: 'Borrow/Payback', icon: '📥', color: '#6366F1' },
   { key: 'savings', label: 'Savings', icon: '💰', color: '#10B981' },
-  { key: 'lending', label: 'Lending', icon: '🤝', color: '#14B8A6' },
+  { key: 'lending', label: 'Lend/Repay', icon: '🤝', color: '#14B8A6' },
   { key: 'extra', label: 'Shopping', icon: '🛍️', color: '#6B7280' },
 ];
 

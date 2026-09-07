@@ -17,7 +17,6 @@ export interface LendingEntrySubmission {
 
 interface Props {
   visible: boolean;
-  action: LendingAction;
   borrowers: Borrower[];
   onAddBorrower: (name: string) => string;
   onSubmit: (data: LendingEntrySubmission) => void;
@@ -26,7 +25,6 @@ interface Props {
 
 export default function LendingEntryModal({
   visible,
-  action,
   borrowers,
   onAddBorrower,
   onSubmit,
@@ -34,6 +32,7 @@ export default function LendingEntryModal({
 }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [action, setAction] = useState<LendingAction>('lend');
   const [borrowerId, setBorrowerId] = useState<string | null>(null);
   const [amountText, setAmountText] = useState('');
   const [note, setNote] = useState('');
@@ -43,6 +42,7 @@ export default function LendingEntryModal({
 
   useEffect(() => {
     if (visible) {
+      setAction('lend');
       setBorrowerId(null);
       setAmountText('');
       setNote('');
@@ -72,6 +72,25 @@ export default function LendingEntryModal({
               <Text style={styles.title}>{title}</Text>
               <TouchableOpacity accessibilityLabel="Close" onPress={onClose} style={styles.headerButton}>
                 <Text style={styles.headerButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[styles.toggleOption, action === 'lend' && styles.toggleOptionActive]}
+                onPress={() => setAction('lend')}
+              >
+                <Text style={[styles.toggleText, action === 'lend' && styles.toggleTextActive]}>
+                  Lend
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleOption, action === 'repaid' && styles.toggleOptionActive]}
+                onPress={() => setAction('repaid')}
+              >
+                <Text style={[styles.toggleText, action === 'repaid' && styles.toggleTextActive]}>
+                  Repay
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -184,6 +203,22 @@ const createStyles = (theme: AppTheme) =>
     },
     headerButtonText: { fontSize: 16, color: theme.textMuted, fontWeight: '700' },
     title: { fontSize: 17, fontWeight: '800', color: theme.text },
+    toggleRow: {
+      flexDirection: 'row',
+      backgroundColor: theme.surfaceMuted,
+      borderRadius: 12,
+      padding: 3,
+      marginBottom: 16,
+    },
+    toggleOption: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 9,
+      alignItems: 'center',
+    },
+    toggleOptionActive: { backgroundColor: theme.navy },
+    toggleText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
+    toggleTextActive: { color: '#FFFFFF' },
     fieldLabel: {
       fontSize: 11,
       fontWeight: '700',
