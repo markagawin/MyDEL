@@ -113,6 +113,7 @@ interface AppDataContextValue {
   addBorrower: (name: string) => string;
   removeBorrower: (id: string) => Promise<void>;
   addSavingsGoal: (name: string) => string;
+  renameSavingsGoal: (id: string, name: string) => Promise<void>;
   removeSavingsGoal: (id: string) => Promise<void>;
   exportBackup: () => BackupData;
   restoreFromBackup: (data: BackupData) => Promise<void>;
@@ -494,6 +495,17 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return goal.id;
   }, []);
 
+  const renameSavingsGoal = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSavingsGoals((prev) => {
+      // The id stays fixed so existing transactions tagged with it keep resolving correctly.
+      const next = prev.map((g) => (g.id === id ? { ...g, name: trimmed } : g));
+      saveSavingsGoals(next);
+      return next;
+    });
+  }, []);
+
   const removeSavingsGoal = useCallback(async (id: string) => {
     setSavingsGoals((prev) => {
       const next = prev.filter((g) => g.id !== id);
@@ -615,6 +627,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     addBorrower,
     removeBorrower,
     addSavingsGoal,
+    renameSavingsGoal,
     removeSavingsGoal,
     exportBackup,
     restoreFromBackup,

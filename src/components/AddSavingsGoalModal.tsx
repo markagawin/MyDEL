@@ -1,22 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SavingsGoal } from '../types';
 import { AppTheme, useTheme } from '../theme';
 import { noWebOutline } from '../webInputStyle';
 
 interface Props {
   visible: boolean;
+  editingGoal?: SavingsGoal | null;
   onSave: (name: string) => void;
   onClose: () => void;
 }
 
-export default function AddSavingsGoalModal({ visible, onSave, onClose }: Props) {
+export default function AddSavingsGoalModal({ visible, editingGoal, onSave, onClose }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isEditing = !!editingGoal;
   const [name, setName] = useState('');
 
   useEffect(() => {
-    if (visible) setName('');
-  }, [visible]);
+    if (visible) setName(editingGoal?.name ?? '');
+  }, [visible, editingGoal]);
 
   const canSave = name.trim().length > 0;
 
@@ -30,7 +33,7 @@ export default function AddSavingsGoalModal({ visible, onSave, onClose }: Props)
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
-          <Text style={styles.title}>New Savings Goal</Text>
+          <Text style={styles.title}>{isEditing ? 'Rename Savings Goal' : 'New Savings Goal'}</Text>
           <TextInput
             style={[styles.input, noWebOutline]}
             value={name}
@@ -49,7 +52,7 @@ export default function AddSavingsGoalModal({ visible, onSave, onClose }: Props)
               disabled={!canSave}
               onPress={handleSave}
             >
-              <Text style={styles.saveButtonText}>Add</Text>
+              <Text style={styles.saveButtonText}>{isEditing ? 'Save' : 'Add'}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
