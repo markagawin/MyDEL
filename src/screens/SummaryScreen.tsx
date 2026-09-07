@@ -15,9 +15,11 @@ import CalendarSummaryModal from '../components/CalendarSummaryModal';
 import SavingsSummaryModal from '../components/SavingsSummaryModal';
 import LendingSummaryModal from '../components/LendingSummaryModal';
 import CreditCardSummaryModal from '../components/CreditCardSummaryModal';
+import BorrowSummaryModal from '../components/BorrowSummaryModal';
 import { isSavingsTransaction } from '../savings';
 import { isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
+import { isBorrowIncoming } from '../borrow';
 import { CategoryKey, Transaction } from '../types';
 
 export default function SummaryScreen() {
@@ -33,6 +35,7 @@ export default function SummaryScreen() {
     totalSaved,
     creditCardBalance,
     totalLent,
+    totalBorrowed,
     borrowers,
     savingsGoals,
     addSavingsGoal,
@@ -47,6 +50,7 @@ export default function SummaryScreen() {
   const [savingsVisible, setSavingsVisible] = useState(false);
   const [lendingVisible, setLendingVisible] = useState(false);
   const [creditCardVisible, setCreditCardVisible] = useState(false);
+  const [borrowVisible, setBorrowVisible] = useState(false);
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
 
@@ -87,11 +91,14 @@ export default function SummaryScreen() {
       // Savings and lending are transfers, not spending. A credit card purchase hasn't left your
       // hand yet, so it's excluded here too — it only counts once you actually pay the card,
       // at which point that "Pay Credit Card" entry counts under its own Credit Card category.
+      // Money borrowed in is real cash but not spending either — it only counts once it's
+      // actually paid back, mirroring the credit card treatment.
       if (
         !inRange(tx) ||
         isSavingsTransaction(tx) ||
         isCreditPurchase(tx) ||
-        isLendingTransaction(tx)
+        isLendingTransaction(tx) ||
+        isBorrowIncoming(tx)
       )
         continue;
       totals.set(tx.category, (totals.get(tx.category) ?? 0) + tx.amount);
@@ -112,7 +119,7 @@ export default function SummaryScreen() {
     for (const tx of transactions) {
       // Keep this in sync with the exclusions in `breakdown` above, so an expanded category's
       // entries always sum to the total shown on its row.
-      if (!inRange(tx) || isCreditPurchase(tx)) continue;
+      if (!inRange(tx) || isCreditPurchase(tx) || isBorrowIncoming(tx)) continue;
       if (!map.has(tx.category)) map.set(tx.category, []);
       map.get(tx.category)!.push(tx);
     }
@@ -199,6 +206,14 @@ export default function SummaryScreen() {
             <Text style={styles.savingsHint}>Across everyone, all time</Text>
           </View>
           <Text style={styles.savingsValue}>{formatPeso(totalLent)}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.savingsCard} onPress={() => setBorrowVisible(true)}>
+          <View>
+            <Text style={styles.savingsLabel}>📥 Money Borrowed</Text>
+            <Text style={styles.savingsHint}>Across everyone, all time</Text>
+          </View>
+          <Text style={styles.savingsValue}>{formatPeso(totalBorrowed)}</Text>
         </TouchableOpacity>
 
         {highest ? (
@@ -351,6 +366,13 @@ export default function SummaryScreen() {
         transactions={transactions}
         categoryMap={categoryMap}
         onClose={() => setCreditCardVisible(false)}
+      />
+
+      <BorrowSummaryModal
+        visible={borrowVisible}
+        transactions={transactions}
+        borrowers={borrowers}
+        onClose={() => setBorrowVisible(false)}
       />
     </SafeAreaView>
   );

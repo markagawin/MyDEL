@@ -10,6 +10,7 @@ import { getAvailableCycles } from '../cycleList';
 import { isSavingsTransaction, savingsActionOf } from '../savings';
 import { isCreditCardPayment, isCreditPurchase } from '../creditCard';
 import { isLendingTransaction, lendingActionOf } from '../lending';
+import { borrowActionOf, isBorrowTransaction } from '../borrow';
 import { Transaction } from '../types';
 import { AppTheme, useTheme } from '../theme';
 import CyclePickerModal from '../components/CyclePickerModal';
@@ -136,13 +137,15 @@ export default function HistoryScreen() {
             const isWithdrawal = isSavings && savingsActionOf(item) === 'withdrawal';
             const isLending = isLendingTransaction(item);
             const isRepaid = isLending && lendingActionOf(item) === 'repaid';
-            const borrowerName = isLending
+            const isBorrow = isBorrowTransaction(item);
+            const isBorrowedIn = isBorrow && borrowActionOf(item) === 'borrow';
+            const borrowerName = isLending || isBorrow
               ? borrowers.find((b) => b.id === item.borrowerId)?.name
               : undefined;
             const savingsGoalName = isSavings
               ? savingsGoals.find((g) => g.id === item.savingsGoalId)?.name
               : undefined;
-            const isMoneyBack = isWithdrawal || isRepaid;
+            const isMoneyBack = isWithdrawal || isRepaid || isBorrowedIn;
             return (
               <Swipeable
                 renderRightActions={() => (
@@ -167,6 +170,7 @@ export default function HistoryScreen() {
                       {meta.label}
                       {isSavings ? ` — ${isWithdrawal ? 'Withdrawal' : 'Deposit'}` : ''}
                       {isLending ? ` — ${isRepaid ? 'Repaid' : 'Lent'}` : ''}
+                      {isBorrow ? ` — ${isBorrowedIn ? 'Borrowed' : 'Paid Back'}` : ''}
                       {isCreditCardPayment(item) ? ' — Payment' : ''}
                       {isCreditPurchase(item) ? ' · Credit' : ''}
                     </Text>
