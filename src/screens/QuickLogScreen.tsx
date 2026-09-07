@@ -22,7 +22,7 @@ import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
 import { CREDIT_CARD_CATEGORY_KEY, isCreditPurchase } from '../creditCard';
 import { LENDING_CATEGORY_KEY, isLendingTransaction, lendingSignedAmount } from '../lending';
-import { BORROW_CATEGORY_KEY, borrowSignedAmount, isBorrowIncoming, isBorrowTransaction } from '../borrow';
+import { BORROW_CATEGORY_KEY, borrowSignedAmount, isBorrowTransaction } from '../borrow';
 import { loadBannerViewState, saveBannerViewState } from '../storage';
 import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
@@ -214,10 +214,10 @@ export default function QuickLogScreen() {
       }, 0);
   }, [transactions, currentCycleIdentifier]);
 
-  // "Total spent so far" excludes savings and lending (moving money, not spending it), credit
-  // purchases (no cash gone yet), and borrowing money in (real cash, but not spending it either)
-  // — but a "Pay Credit Card" entry or paying someone back counts normally, since that's the
-  // moment real cash actually leaves.
+  // "Total spent so far" excludes savings, lending, and borrowing (all just moving money between
+  // you and someone/something else, tracked in their own summaries, not spending it) and credit
+  // purchases (no cash gone yet) — but a "Pay Credit Card" entry counts normally, since that's
+  // the moment real cash actually leaves.
   const periodSpentTotal = useMemo(() => {
     return transactions
       .filter(
@@ -226,7 +226,7 @@ export default function QuickLogScreen() {
           !isSavingsTransaction(t) &&
           !isCreditPurchase(t) &&
           !isLendingTransaction(t) &&
-          !isBorrowIncoming(t)
+          !isBorrowTransaction(t)
       )
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions, currentCycleIdentifier]);
@@ -240,7 +240,7 @@ export default function QuickLogScreen() {
           !isSavingsTransaction(t) &&
           !isCreditPurchase(t) &&
           !isLendingTransaction(t) &&
-          !isBorrowIncoming(t) &&
+          !isBorrowTransaction(t) &&
           sameDay(new Date(t.timestamp), now)
       )
       .reduce((sum, t) => sum + t.amount, 0);
