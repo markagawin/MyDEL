@@ -6,10 +6,10 @@ import { CategoryMeta } from '../categories';
 import { formatPeso } from '../currency';
 import { endOfDay, parseCycleIdentifier, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
-import { isSavingsTransaction, savingsSignedAmount } from '../savings';
+import { isSavingsTransaction, savingsActionOf } from '../savings';
 import { isCreditPurchase } from '../creditCard';
-import { isLendingTransaction, lendingActionOf, lendingSignedAmount } from '../lending';
-import { borrowActionOf, isBorrowTransaction, borrowSignedAmount } from '../borrow';
+import { isLendingTransaction, lendingActionOf } from '../lending';
+import { borrowActionOf, isBorrowTransaction } from '../borrow';
 import { AppTheme, useTheme } from '../theme';
 
 interface Props {
@@ -26,10 +26,13 @@ interface CategoryAmount {
   amount: number;
 }
 
-interface TransferAmount {
+/** One line of the "how we got to Remaining" equation. `sign` is which way it moves Remaining —
+ * it's the opposite of how the label reads sometimes (e.g. "Spent" always reduces Remaining). */
+interface EquationLine {
   icon: string;
   label: string;
   amount: number;
+  sign: 1 | -1;
 }
 
 interface CycleRow {
@@ -40,7 +43,8 @@ interface CycleRow {
   spent: number;
   remaining: number | null;
   breakdown: CategoryAmount[];
-  transfers: TransferAmount[];
+  equationLines: EquationLine[];
+  chargedToCard: number;
 }
 
 export default function CycleHistoryModal({
@@ -69,19 +73,10 @@ export default function CycleHistoryModal({
         const time = new Date(t.timestamp).getTime();
         return time >= fromTime && time <= toTime;
       });
-      // Same net-outflow math the QuickLog banner uses for "Remaining of paycheck": a credit
-      // purchase hasn't left your hand yet, savings/lending/borrowing are transfers whose sign
-      // depends on direction, everything else is a plain expense.
-      const outflow = cycleTxs
-        .filter((t) => !isCreditPurchase(t))
-        .reduce((sum, t) => {
-          if (isSavingsTransaction(t)) return sum + savingsSignedAmount(t);
-          if (isLendingTransaction(t)) return sum + lendingSignedAmount(t);
-          if (isBorrowTransaction(t)) return sum - borrowSignedAmount(t);
-          return sum + t.amount;
-        }, 0);
+
       // Same category-spend totals Summary shows for the current cycle — savings, lending, and
       // borrowing are transfers, not spending, and a credit purchase hasn't left your hand yet.
+      // A credit card *payment* still counts here under its own category, same as Summary.
       const categoryTotals = new Map<string, number>();
       for (const t of cycleTxs) {
         if (
@@ -98,47 +93,72 @@ export default function CycleHistoryModal({
         .filter((r) => r.amount > 0)
         .sort((a, b) => b.amount - a.amount);
       const spent = breakdown.reduce((sum, r) => sum + r.amount, 0);
-      const paycheck = paychecks[opt.identifier] ?? null;
-      const remaining = paycheck !== null ? paycheck - outflow : null;
 
-      // Borrowing, lending, and credit purchases don't show up in the category breakdown above
-      // (they're transfers or deferred spend, not real spending yet), so surface them here
-      // instead whenever this cycle actually had any. A credit card *payment* is real cash
-      // leaving your hand, so it still counts under its own category in the breakdown, same as
-      // Summary already treats it — only the purchase side (still owed) needs surfacing here.
-      let borrowed = 0;
-      let paidBack = 0;
+      // Every other piece that moves Remaining, tallied by direction. A credit card purchase is
+      // deferred — it doesn't touch Remaining at all until it's actually paid — so it's tracked
+      // separately below instead of folded into this math.
+      let savingsDeposit = 0;
+      let savingsWithdrawal = 0;
       let lent = 0;
       let repaid = 0;
+      let borrowed = 0;
+      let paidBack = 0;
       let chargedToCard = 0;
       for (const t of cycleTxs) {
-        if (isBorrowTransaction(t)) {
-          if (borrowActionOf(t) === 'paid_back') paidBack += t.amount;
-          else borrowed += t.amount;
+        if (isSavingsTransaction(t)) {
+          if (savingsActionOf(t) === 'withdrawal') savingsWithdrawal += t.amount;
+          else savingsDeposit += t.amount;
         } else if (isLendingTransaction(t)) {
           if (lendingActionOf(t) === 'repaid') repaid += t.amount;
           else lent += t.amount;
+        } else if (isBorrowTransaction(t)) {
+          if (borrowActionOf(t) === 'paid_back') paidBack += t.amount;
+          else borrowed += t.amount;
         } else if (isCreditPurchase(t)) {
           chargedToCard += t.amount;
         }
       }
-      const transfers: TransferAmount[] = [];
-      if (borrowed > 0) transfers.push({ icon: '📥', label: 'Borrowed', amount: borrowed });
-      if (paidBack > 0) transfers.push({ icon: '💸', label: 'Paid back', amount: paidBack });
-      if (lent > 0) transfers.push({ icon: '🤝', label: 'Lent', amount: lent });
-      if (repaid > 0) transfers.push({ icon: '💵', label: 'Repaid', amount: repaid });
-      if (chargedToCard > 0)
-        transfers.push({ icon: '💳', label: 'Charged to card', amount: chargedToCard });
+
+      const remaining =
+        paychecks[opt.identifier] !== undefined
+          ? paychecks[opt.identifier] -
+            spent -
+            savingsDeposit +
+            savingsWithdrawal -
+            lent +
+            repaid +
+            borrowed -
+            paidBack
+          : null;
+
+      const equationLines: EquationLine[] = [{ icon: '🧾', label: 'Spent', amount: spent, sign: -1 }];
+      if (savingsDeposit > 0)
+        equationLines.push({ icon: '💰', label: 'Saved', amount: savingsDeposit, sign: -1 });
+      if (savingsWithdrawal > 0)
+        equationLines.push({
+          icon: '💰',
+          label: 'Withdrew from savings',
+          amount: savingsWithdrawal,
+          sign: 1,
+        });
+      if (lent > 0) equationLines.push({ icon: '🤝', label: 'Lent out', amount: lent, sign: -1 });
+      if (repaid > 0)
+        equationLines.push({ icon: '💵', label: 'Repaid to you', amount: repaid, sign: 1 });
+      if (borrowed > 0)
+        equationLines.push({ icon: '📥', label: 'Borrowed', amount: borrowed, sign: 1 });
+      if (paidBack > 0)
+        equationLines.push({ icon: '💸', label: 'Paid back', amount: paidBack, sign: -1 });
 
       return {
         identifier: opt.identifier,
         label: opt.label,
         isCurrent: opt.isCurrent,
-        paycheck,
+        paycheck: paychecks[opt.identifier] ?? null,
         spent,
         remaining,
         breakdown,
-        transfers,
+        equationLines,
+        chargedToCard,
       };
     });
   }, [transactions, currentCycleRange, paychecks, categories]);
@@ -166,9 +186,9 @@ export default function CycleHistoryModal({
                 row.remaining === null
                   ? null
                   : row.remaining < 0
-                    ? "You went over your paycheck by"
+                    ? 'You went over your paycheck by'
                     : row.isCurrent
-                      ? "You have this much left so far"
+                      ? 'You have this much left so far'
                       : 'You had this much left over';
               return (
                 <TouchableOpacity
@@ -203,38 +223,58 @@ export default function CycleHistoryModal({
                   </View>
                   {remainingPhrase && <Text style={styles.cardSubLabel}>{remainingPhrase}</Text>}
 
-                  <View style={styles.statRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>Paycheck</Text>
-                      <Text style={styles.statValue}>
-                        {row.paycheck !== null ? formatPeso(row.paycheck) : '—'}
-                      </Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>You spent</Text>
-                      <Text style={styles.statValue}>{formatPeso(row.spent)}</Text>
-                    </View>
+                  {/* The math behind Remaining, spelled out line by line — always visible, not
+                      behind the tap, so the number above is never a mystery. */}
+                  <View style={styles.equation}>
+                    {row.paycheck !== null && (
+                      <View style={styles.equationRow}>
+                        <Text style={styles.equationLabel}>Paycheck</Text>
+                        <Text style={styles.equationAmount}>{formatPeso(row.paycheck)}</Text>
+                      </View>
+                    )}
+                    {row.equationLines.map((line, i) => (
+                      <View key={i} style={styles.equationRow}>
+                        <Text style={styles.equationLabel}>
+                          {line.icon} {line.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.equationAmount,
+                            line.sign > 0 ? styles.equationPositive : styles.equationNegative,
+                          ]}
+                        >
+                          {line.sign > 0 ? '+ ' : '− '}
+                          {formatPeso(line.amount)}
+                        </Text>
+                      </View>
+                    ))}
+                    {row.remaining !== null && (
+                      <View style={[styles.equationRow, styles.equationTotalRow]}>
+                        <Text style={styles.equationTotalLabel}>Remaining</Text>
+                        <Text
+                          style={[
+                            styles.equationTotalAmount,
+                            row.remaining < 0 && styles.remainingNegative,
+                          ]}
+                        >
+                          {formatPeso(row.remaining)}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
-                  {/* Always visible (not behind the tap) — these are exactly the pieces that
-                      make up "Remaining" beyond plain spending, so it stays understandable
-                      without expanding. */}
-                  {row.transfers.length > 0 && (
-                    <View style={styles.transferList}>
-                      {row.transfers.map((t) => (
-                        <View key={t.label} style={styles.breakdownRow}>
-                          <View style={styles.breakdownLeft}>
-                            <Text style={styles.breakdownIcon}>{t.icon}</Text>
-                            <Text style={styles.breakdownLabel}>{t.label}</Text>
-                          </View>
-                          <Text style={styles.breakdownAmount}>{formatPeso(t.amount)}</Text>
-                        </View>
-                      ))}
+                  {row.chargedToCard > 0 && (
+                    <View style={styles.cardNote}>
+                      <Text style={styles.cardNoteText}>
+                        💳 Also charged {formatPeso(row.chargedToCard)} to your card this cycle —
+                        owed, but not counted above until you actually pay it.
+                      </Text>
                     </View>
                   )}
 
                   {isExpanded && (
                     <View style={styles.breakdownList}>
+                      <Text style={styles.breakdownHeading}>WHAT YOU SPENT IT ON</Text>
                       {row.breakdown.length === 0 ? (
                         <Text style={styles.breakdownEmpty}>Nothing spent this cycle yet.</Text>
                       ) : (
@@ -316,25 +356,43 @@ const createStyles = (theme: AppTheme) =>
     noPaycheckValue: { fontSize: 12.5, fontWeight: '600', color: theme.textMuted },
     chevron: { fontSize: 12, color: theme.textMuted },
     cardSubLabel: { fontSize: 12, color: theme.textMuted, marginTop: 2, marginBottom: 10 },
-    statRow: { flexDirection: 'row', gap: 24 },
-    statItem: {},
-    statLabel: {
-      fontSize: 11.5,
-      fontWeight: '600',
-      color: theme.textMuted,
-      marginBottom: 2,
+    equation: {
+      marginTop: 4,
+      gap: 6,
     },
-    statValue: { fontSize: 13.5, fontWeight: '700', color: theme.text },
-    transferList: {
-      marginTop: 12,
-      gap: 8,
+    equationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    equationLabel: { fontSize: 13, color: theme.textMuted, fontWeight: '600' },
+    equationAmount: { fontSize: 13, fontWeight: '700', color: theme.text },
+    equationPositive: { color: theme.success },
+    equationNegative: { color: theme.text },
+    equationTotalRow: {
+      marginTop: 6,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
     },
+    equationTotalLabel: { fontSize: 13.5, fontWeight: '800', color: theme.text },
+    equationTotalAmount: { fontSize: 14.5, fontWeight: '800', color: theme.text },
+    cardNote: {
+      marginTop: 10,
+      backgroundColor: theme.surfaceMuted,
+      borderRadius: 10,
+      padding: 10,
+    },
+    cardNoteText: { fontSize: 11.5, color: theme.textMuted, lineHeight: 16 },
     breakdownList: {
       marginTop: 14,
       paddingTop: 12,
       borderTopWidth: 1,
       borderTopColor: theme.border,
       gap: 10,
+    },
+    breakdownHeading: {
+      fontSize: 10.5,
+      fontWeight: '700',
+      color: theme.textMuted,
+      letterSpacing: 0.5,
+      marginBottom: 2,
     },
     breakdownEmpty: { fontSize: 12.5, color: theme.textMuted },
     breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
