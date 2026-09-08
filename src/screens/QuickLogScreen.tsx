@@ -16,10 +16,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../AppDataContext';
-import { CategoryKey, SavingsAction } from '../types';
+import { CategoryKey } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, sameDay } from '../cycleEngine';
-import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
+import { SAVINGS_CATEGORY_KEY, computeTotalSaved, isSavingsTransaction, savingsSignedAmount } from '../savings';
 import { CREDIT_CARD_CATEGORY_KEY, computeCreditCardBalance, isCreditPurchase } from '../creditCard';
 import { LENDING_CATEGORY_KEY, isLendingTransaction, lendingSignedAmount } from '../lending';
 import { BORROW_CATEGORY_KEY, borrowSignedAmount, isBorrowTransaction } from '../borrow';
@@ -30,7 +30,7 @@ import AddCategoryModal from '../components/AddCategoryModal';
 import BorrowEntryModal, { BorrowEntrySubmission } from '../components/BorrowEntryModal';
 import LendingEntryModal, { LendingEntrySubmission } from '../components/LendingEntryModal';
 import CreditCardEntryModal, { CreditCardEntrySubmission } from '../components/CreditCardEntryModal';
-import AddSavingsGoalModal from '../components/AddSavingsGoalModal';
+import SavingsEntryModal, { SavingsEntrySubmission } from '../components/SavingsEntryModal';
 import DatePickerModal from '../components/DatePickerModal';
 import Toast from '../components/Toast';
 import { noWebOutline, webPanYOnly } from '../webInputStyle';
@@ -57,12 +57,10 @@ export default function QuickLogScreen() {
   } = useAppData();
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
-  const [savingsAction, setSavingsAction] = useState<SavingsAction>('deposit');
-  const [savingsGoalId, setSavingsGoalId] = useState<string | null>(null);
-  const [addSavingsGoalModalVisible, setAddSavingsGoalModalVisible] = useState(false);
   const [borrowModalVisible, setBorrowModalVisible] = useState(false);
   const [lendingModalVisible, setLendingModalVisible] = useState(false);
   const [creditCardModalVisible, setCreditCardModalVisible] = useState(false);
+  const [savingsModalVisible, setSavingsModalVisible] = useState(false);
   const [note, setNote] = useState('');
   const [entryDate, setEntryDate] = useState(() => new Date());
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
@@ -253,6 +251,7 @@ export default function QuickLogScreen() {
   }, [categories.length]);
 
   const creditCardBalance = useMemo(() => computeCreditCardBalance(transactions), [transactions]);
+  const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
 
   const remaining = currentPaycheck !== null ? currentPaycheck - periodTotal : null;
   const pctSpent =
@@ -268,9 +267,6 @@ export default function QuickLogScreen() {
     const loggedAmount = amountValue;
     const loggedCategory = category;
     const loggedNote = note;
-    const loggedSavingsAction = savingsAction;
-    const loggedSavingsGoalId = savingsGoalId;
-    const isSavings = loggedCategory === SAVINGS_CATEGORY_KEY;
 
     const now = new Date();
     const timestamp = new Date(
@@ -287,8 +283,6 @@ export default function QuickLogScreen() {
     setNote('');
     setAmountBlurred(false);
     setEntryDate(new Date());
-    setSavingsAction('deposit');
-    setSavingsGoalId(null);
     amountInputRef.current?.blur();
 
     const newId = addTransaction({
@@ -296,18 +290,9 @@ export default function QuickLogScreen() {
       category: loggedCategory,
       note: loggedNote,
       timestamp,
-      savingsAction: isSavings ? loggedSavingsAction : undefined,
-      savingsGoalId: isSavings ? loggedSavingsGoalId ?? undefined : undefined,
     });
 
-    showToast(
-      isSavings
-        ? loggedSavingsAction === 'withdrawal'
-          ? `${formatPeso(loggedAmount)} withdrawn from savings`
-          : `${formatPeso(loggedAmount)} deposited to savings`
-        : `${formatPeso(loggedAmount)} added successfully`,
-      newId
-    );
+    showToast(`${formatPeso(loggedAmount)} added successfully`, newId);
   };
 
   // Shared by handleLog and the Borrow/Lending popups' submit — shows the success toast with undo.
@@ -404,6 +389,34 @@ export default function QuickLogScreen() {
       isPayment
         ? `${formatPeso(data.amount)} paid toward credit card`
         : `${formatPeso(data.amount)} charged to credit card`,
+      newId
+    );
+  };
+
+  const handleSavingsSubmit = (data: SavingsEntrySubmission) => {
+    const now = new Date();
+    const timestamp = new Date(
+      data.date.getFullYear(),
+      data.date.getMonth(),
+      data.date.getDate(),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    );
+    const newId = addTransaction({
+      amount: data.amount,
+      category: SAVINGS_CATEGORY_KEY,
+      note: data.note,
+      timestamp,
+      savingsAction: data.action,
+      savingsGoalId: data.goalId ?? undefined,
+    });
+    setSavingsModalVisible(false);
+    showToast(
+      data.action === 'withdrawal'
+        ? `${formatPeso(data.amount)} withdrawn from savings`
+        : `${formatPeso(data.amount)} deposited to savings`,
       newId
     );
   };
@@ -559,9 +572,9 @@ export default function QuickLogScreen() {
                 <Pressable
                   key={cat.key}
                   onPress={() => {
-                    // Credit Card, Borrow, and Lending each use their own guided popup instead
-                    // of the inline amount-first flow — none of them ever becomes the selected
-                    // category here.
+                    // Credit Card, Borrow, Lending, and Savings each use their own guided popup
+                    // instead of the inline amount-first flow — none of them ever becomes the
+                    // selected category here.
                     if (cat.key === CREDIT_CARD_CATEGORY_KEY) {
                       setCreditCardModalVisible(true);
                       return;
@@ -574,9 +587,11 @@ export default function QuickLogScreen() {
                       setLendingModalVisible(true);
                       return;
                     }
+                    if (cat.key === SAVINGS_CATEGORY_KEY) {
+                      setSavingsModalVisible(true);
+                      return;
+                    }
                     setCategory(selected ? null : cat.key);
-                    setSavingsAction('deposit');
-                    setSavingsGoalId(null);
                   }}
                   style={[
                     styles.tile,
@@ -601,76 +616,6 @@ export default function QuickLogScreen() {
               <View key={`filler-${i}`} style={[styles.tile, styles.tileFiller]} />
             ))}
           </View>
-
-          {category === SAVINGS_CATEGORY_KEY && (
-            <View style={styles.savingsToggleRow}>
-              <TouchableOpacity
-                style={[
-                  styles.savingsToggleOption,
-                  savingsAction === 'deposit' && styles.savingsToggleOptionActive,
-                ]}
-                onPress={() => setSavingsAction('deposit')}
-              >
-                <Text
-                  style={[
-                    styles.savingsToggleText,
-                    savingsAction === 'deposit' && styles.savingsToggleTextActive,
-                  ]}
-                >
-                  Deposit
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.savingsToggleOption,
-                  savingsAction === 'withdrawal' && styles.savingsToggleOptionActive,
-                ]}
-                onPress={() => setSavingsAction('withdrawal')}
-              >
-                <Text
-                  style={[
-                    styles.savingsToggleText,
-                    savingsAction === 'withdrawal' && styles.savingsToggleTextActive,
-                  ]}
-                >
-                  Withdrawal
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {category === SAVINGS_CATEGORY_KEY && (
-            <>
-              <Text style={styles.fieldLabelMuted}>GOAL (OPTIONAL)</Text>
-              <View style={styles.borrowerRow}>
-                {savingsGoals.map((g) => {
-                  const selected = savingsGoalId === g.id;
-                  return (
-                    <TouchableOpacity
-                      key={g.id}
-                      style={[styles.borrowerChip, selected && styles.borrowerChipSelected]}
-                      onPress={() => setSavingsGoalId(selected ? null : g.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.borrowerChipText,
-                          selected && styles.borrowerChipTextSelected,
-                        ]}
-                      >
-                        {g.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                <TouchableOpacity
-                  style={[styles.borrowerChip, styles.addBorrowerChip]}
-                  onPress={() => setAddSavingsGoalModalVisible(true)}
-                >
-                  <Text style={styles.addBorrowerChipText}>+ Add Goal</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
 
           <Text style={styles.fieldLabelMuted}>NOTE (OPTIONAL)</Text>
           <View style={styles.noteWrap}>
@@ -744,10 +689,13 @@ export default function QuickLogScreen() {
         onClose={() => setCreditCardModalVisible(false)}
       />
 
-      <AddSavingsGoalModal
-        visible={addSavingsGoalModalVisible}
-        onSave={(name) => setSavingsGoalId(addSavingsGoal(name))}
-        onClose={() => setAddSavingsGoalModalVisible(false)}
+      <SavingsEntryModal
+        visible={savingsModalVisible}
+        savingsGoals={savingsGoals}
+        currentTotalSaved={totalSaved}
+        onAddGoal={addSavingsGoal}
+        onSubmit={handleSavingsSubmit}
+        onClose={() => setSavingsModalVisible(false)}
       />
 
       <DatePickerModal
@@ -907,41 +855,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   addTileIcon: { fontSize: 22, fontWeight: '700', color: theme.textMuted, marginBottom: 2 },
   addTileLabel: { fontSize: 10.5, fontWeight: '600', color: theme.textMuted },
   tileFiller: { backgroundColor: 'transparent', borderColor: 'transparent' },
-  savingsToggleRow: {
-    flexDirection: 'row',
-    backgroundColor: theme.surfaceMuted,
-    borderRadius: 12,
-    padding: 3,
-    marginBottom: 16,
-  },
-  savingsToggleOption: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9,
-    alignItems: 'center',
-  },
-  savingsToggleOptionActive: { backgroundColor: theme.navy },
-  savingsToggleText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
-  savingsToggleTextActive: { color: '#FFFFFF' },
-  borrowerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  borrowerChip: {
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-    backgroundColor: theme.card,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  borrowerChipSelected: { backgroundColor: theme.navy, borderColor: theme.navy },
-  borrowerChipText: { fontSize: 13, fontWeight: '600', color: theme.text },
-  borrowerChipTextSelected: { color: '#FFFFFF' },
-  addBorrowerChip: { borderStyle: 'dashed', backgroundColor: theme.background },
-  addBorrowerChipText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
   noteWrap: {
     flexDirection: 'row',
     alignItems: 'center',
