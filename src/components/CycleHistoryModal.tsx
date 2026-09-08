@@ -101,12 +101,16 @@ export default function CycleHistoryModal({
       const paycheck = paychecks[opt.identifier] ?? null;
       const remaining = paycheck !== null ? paycheck - outflow : null;
 
-      // Borrowing and lending don't show up in the category breakdown above (they're transfers,
-      // not spending), so surface them here instead whenever this cycle actually had any.
+      // Borrowing, lending, and credit purchases don't show up in the category breakdown above
+      // (they're transfers or deferred spend, not real spending yet), so surface them here
+      // instead whenever this cycle actually had any. A credit card *payment* is real cash
+      // leaving your hand, so it still counts under its own category in the breakdown, same as
+      // Summary already treats it — only the purchase side (still owed) needs surfacing here.
       let borrowed = 0;
       let paidBack = 0;
       let lent = 0;
       let repaid = 0;
+      let chargedToCard = 0;
       for (const t of cycleTxs) {
         if (isBorrowTransaction(t)) {
           if (borrowActionOf(t) === 'paid_back') paidBack += t.amount;
@@ -114,6 +118,8 @@ export default function CycleHistoryModal({
         } else if (isLendingTransaction(t)) {
           if (lendingActionOf(t) === 'repaid') repaid += t.amount;
           else lent += t.amount;
+        } else if (isCreditPurchase(t)) {
+          chargedToCard += t.amount;
         }
       }
       const transfers: TransferAmount[] = [];
@@ -121,6 +127,8 @@ export default function CycleHistoryModal({
       if (paidBack > 0) transfers.push({ icon: '💸', label: 'Paid back', amount: paidBack });
       if (lent > 0) transfers.push({ icon: '🤝', label: 'Lent', amount: lent });
       if (repaid > 0) transfers.push({ icon: '💵', label: 'Repaid', amount: repaid });
+      if (chargedToCard > 0)
+        transfers.push({ icon: '💳', label: 'Charged to card', amount: chargedToCard });
 
       return {
         identifier: opt.identifier,
