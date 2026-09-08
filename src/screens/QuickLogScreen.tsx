@@ -20,7 +20,7 @@ import { CategoryKey, SavingsAction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, sameDay } from '../cycleEngine';
 import { SAVINGS_CATEGORY_KEY, isSavingsTransaction, savingsSignedAmount } from '../savings';
-import { CREDIT_CARD_CATEGORY_KEY, isCreditPurchase } from '../creditCard';
+import { CREDIT_CARD_CATEGORY_KEY, computeCreditCardBalance, isCreditPurchase } from '../creditCard';
 import { LENDING_CATEGORY_KEY, isLendingTransaction, lendingSignedAmount } from '../lending';
 import { BORROW_CATEGORY_KEY, borrowSignedAmount, isBorrowTransaction } from '../borrow';
 import { loadBannerViewState, saveBannerViewState } from '../storage';
@@ -29,6 +29,7 @@ import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
 import BorrowEntryModal, { BorrowEntrySubmission } from '../components/BorrowEntryModal';
 import LendingEntryModal, { LendingEntrySubmission } from '../components/LendingEntryModal';
+import CreditCardEntryModal, { CreditCardEntrySubmission } from '../components/CreditCardEntryModal';
 import AddSavingsGoalModal from '../components/AddSavingsGoalModal';
 import DatePickerModal from '../components/DatePickerModal';
 import Toast from '../components/Toast';
@@ -61,10 +62,7 @@ export default function QuickLogScreen() {
   const [addSavingsGoalModalVisible, setAddSavingsGoalModalVisible] = useState(false);
   const [borrowModalVisible, setBorrowModalVisible] = useState(false);
   const [lendingModalVisible, setLendingModalVisible] = useState(false);
-  // True once the Credit Card tile has been tapped from the top-level grid — swaps the grid to
-  // "what was this for" (real categories + a Pay Credit Card option) so a credit purchase is
-  // always explicitly tied to a real category, never left as a bare "Credit Card" entry.
-  const [creditGateActive, setCreditGateActive] = useState(false);
+  const [creditCardModalVisible, setCreditCardModalVisible] = useState(false);
   const [note, setNote] = useState('');
   const [entryDate, setEntryDate] = useState(() => new Date());
   const [paycheckModalVisible, setPaycheckModalVisible] = useState(false);
@@ -244,35 +242,17 @@ export default function QuickLogScreen() {
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions]);
 
-  // Once the Credit Card gate is active, the grid swaps to "what was this for": real categories
-  // only (Savings, Borrow, Lending, and the Credit Card tile itself don't make sense as a credit
-  // purchase), plus a relabeled Credit Card tile that now means "log this as a card payment
-  // instead".
-  const visibleCategories = useMemo(() => {
-    if (!creditGateActive) return categories;
-    const creditCardMeta = categories.find((c) => c.key === CREDIT_CARD_CATEGORY_KEY);
-    const realCategories = categories.filter(
-      (c) =>
-        c.key !== SAVINGS_CATEGORY_KEY &&
-        c.key !== CREDIT_CARD_CATEGORY_KEY &&
-        c.key !== BORROW_CATEGORY_KEY &&
-        c.key !== LENDING_CATEGORY_KEY
-    );
-    return creditCardMeta
-      ? [...realCategories, { ...creditCardMeta, label: 'Pay Credit Card' }]
-      : realCategories;
-  }, [categories, creditGateActive]);
-
   // The grid is 4 tiles per row with justifyContent: 'space-between', which spaces a
   // *partial* last row differently depending on how many tiles are in it (1 tile sits at the
-  // left, 3 tiles spread edge-to-edge, etc.) — so the layout visibly jumps whenever the tile
-  // count changes, e.g. entering/leaving the credit card gate. Padding the count up to a
-  // multiple of 4 with invisible filler tiles gives space-between a full row to distribute
-  // every time, which keeps the real tiles consistently left-anchored regardless of count.
+  // left, 3 tiles spread edge-to-edge, etc.). Padding the count up to a multiple of 4 with
+  // invisible filler tiles gives space-between a full row to distribute every time, which keeps
+  // the real tiles consistently left-anchored regardless of count.
   const gridFillerCount = useMemo(() => {
-    const totalTiles = visibleCategories.length + (creditGateActive ? 0 : 1); // +1 for Add tile
+    const totalTiles = categories.length + 1; // +1 for Add tile
     return (4 - (totalTiles % 4)) % 4;
-  }, [visibleCategories.length, creditGateActive]);
+  }, [categories.length]);
+
+  const creditCardBalance = useMemo(() => computeCreditCardBalance(transactions), [transactions]);
 
   const remaining = currentPaycheck !== null ? currentPaycheck - periodTotal : null;
   const pctSpent =
@@ -291,11 +271,6 @@ export default function QuickLogScreen() {
     const loggedSavingsAction = savingsAction;
     const loggedSavingsGoalId = savingsGoalId;
     const isSavings = loggedCategory === SAVINGS_CATEGORY_KEY;
-    const isCreditCardPaymentEntry = loggedCategory === CREDIT_CARD_CATEGORY_KEY;
-    // Reached the credit gate and picked a real category: this is a purchase charged to the
-    // card. Picking "Pay Credit Card" itself (loggedCategory === CREDIT_CARD_CATEGORY_KEY) is a
-    // payment instead, not a purchase, so it isn't tagged as one.
-    const isCreditPurchaseEntry = creditGateActive && !isCreditCardPaymentEntry;
 
     const now = new Date();
     const timestamp = new Date(
@@ -314,7 +289,6 @@ export default function QuickLogScreen() {
     setEntryDate(new Date());
     setSavingsAction('deposit');
     setSavingsGoalId(null);
-    setCreditGateActive(false);
     amountInputRef.current?.blur();
 
     const newId = addTransaction({
@@ -324,7 +298,6 @@ export default function QuickLogScreen() {
       timestamp,
       savingsAction: isSavings ? loggedSavingsAction : undefined,
       savingsGoalId: isSavings ? loggedSavingsGoalId ?? undefined : undefined,
-      paymentMethod: isCreditPurchaseEntry ? 'credit' : undefined,
     });
 
     showToast(
@@ -332,11 +305,7 @@ export default function QuickLogScreen() {
         ? loggedSavingsAction === 'withdrawal'
           ? `${formatPeso(loggedAmount)} withdrawn from savings`
           : `${formatPeso(loggedAmount)} deposited to savings`
-        : isCreditCardPaymentEntry
-          ? `${formatPeso(loggedAmount)} paid toward credit card`
-          : isCreditPurchaseEntry
-            ? `${formatPeso(loggedAmount)} charged to credit card`
-            : `${formatPeso(loggedAmount)} added successfully`,
+        : `${formatPeso(loggedAmount)} added successfully`,
       newId
     );
   };
@@ -407,6 +376,34 @@ export default function QuickLogScreen() {
       data.lendingAction === 'repaid'
         ? `${formatPeso(data.amount)} repaid by ${borrowerName}`
         : `${formatPeso(data.amount)} lent to ${borrowerName}`,
+      newId
+    );
+  };
+
+  const handleCreditCardSubmit = (data: CreditCardEntrySubmission) => {
+    const now = new Date();
+    const timestamp = new Date(
+      data.date.getFullYear(),
+      data.date.getMonth(),
+      data.date.getDate(),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    );
+    const isPayment = data.action === 'pay';
+    const newId = addTransaction({
+      amount: data.amount,
+      category: isPayment ? CREDIT_CARD_CATEGORY_KEY : data.category!,
+      note: data.note,
+      timestamp,
+      paymentMethod: isPayment ? undefined : 'credit',
+    });
+    setCreditCardModalVisible(false);
+    showToast(
+      isPayment
+        ? `${formatPeso(data.amount)} paid toward credit card`
+        : `${formatPeso(data.amount)} charged to credit card`,
       newId
     );
   };
@@ -555,34 +552,20 @@ export default function QuickLogScreen() {
             <Text style={styles.categoryPrompt}>👇 Pick a category for this amount</Text>
           )}
 
-          {creditGateActive && (
-            <View style={styles.creditGateBanner}>
-              <Text style={styles.creditGateBannerText}>💳 Using credit card</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setCreditGateActive(false);
-                  setCategory(null);
-                }}
-              >
-                <Text style={styles.creditGateBannerCancel}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
           <View style={styles.grid}>
-            {visibleCategories.map((cat) => {
+            {categories.map((cat) => {
               const selected = category === cat.key;
               return (
                 <Pressable
                   key={cat.key}
                   onPress={() => {
-                    if (cat.key === CREDIT_CARD_CATEGORY_KEY && !creditGateActive) {
-                      setCreditGateActive(true);
-                      setCategory(null);
+                    // Credit Card, Borrow, and Lending each use their own guided popup instead
+                    // of the inline amount-first flow — none of them ever becomes the selected
+                    // category here.
+                    if (cat.key === CREDIT_CARD_CATEGORY_KEY) {
+                      setCreditCardModalVisible(true);
                       return;
                     }
-                    // Borrow and Lending each use their own guided popup instead of the inline
-                    // amount-first flow — neither ever becomes the selected category here.
                     if (cat.key === BORROW_CATEGORY_KEY) {
                       setBorrowModalVisible(true);
                       return;
@@ -607,15 +590,13 @@ export default function QuickLogScreen() {
                 </Pressable>
               );
             })}
-            {!creditGateActive && (
-              <Pressable
-                style={[styles.tile, styles.addTile]}
-                onPress={() => setAddCategoryModalVisible(true)}
-              >
-                <Text style={styles.addTileIcon}>+</Text>
-                <Text style={styles.addTileLabel}>Add</Text>
-              </Pressable>
-            )}
+            <Pressable
+              style={[styles.tile, styles.addTile]}
+              onPress={() => setAddCategoryModalVisible(true)}
+            >
+              <Text style={styles.addTileIcon}>+</Text>
+              <Text style={styles.addTileLabel}>Add</Text>
+            </Pressable>
             {Array.from({ length: gridFillerCount }).map((_, i) => (
               <View key={`filler-${i}`} style={[styles.tile, styles.tileFiller]} />
             ))}
@@ -755,6 +736,14 @@ export default function QuickLogScreen() {
         onClose={() => setLendingModalVisible(false)}
       />
 
+      <CreditCardEntryModal
+        visible={creditCardModalVisible}
+        categories={categories}
+        currentBalance={creditCardBalance}
+        onSubmit={handleCreditCardSubmit}
+        onClose={() => setCreditCardModalVisible(false)}
+      />
+
       <AddSavingsGoalModal
         visible={addSavingsGoalModalVisible}
         onSave={(name) => setSavingsGoalId(addSavingsGoal(name))}
@@ -885,18 +874,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
-  creditGateBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: theme.surfaceMuted,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  creditGateBannerText: { fontSize: 13, fontWeight: '700', color: theme.text },
-  creditGateBannerCancel: { fontSize: 12.5, fontWeight: '700', color: theme.danger },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
