@@ -389,6 +389,7 @@ export default function SummaryScreen() {
         transactions={transactions}
         currentCycleRange={currentCycleRange}
         paychecks={paychecks}
+        categories={categories}
         onClose={() => setCycleHistoryVisible(false)}
       />
     </SafeAreaView>

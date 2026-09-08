@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CycleRange, Transaction } from '../types';
+import { CategoryMeta } from '../categories';
 import { formatPeso } from '../currency';
 import { getAvailableCycles } from '../cycleList';
 import { isSavingsTransaction, savingsSignedAmount } from '../savings';
@@ -15,7 +16,13 @@ interface Props {
   transactions: Transaction[];
   currentCycleRange: CycleRange;
   paychecks: Record<string, number>;
+  categories: CategoryMeta[];
   onClose: () => void;
+}
+
+interface CategoryAmount {
+  meta: CategoryMeta;
+  amount: number;
 }
 
 interface CycleRow {
@@ -25,6 +32,7 @@ interface CycleRow {
   paycheck: number | null;
   spent: number;
   remaining: number | null;
+  breakdown: CategoryAmount[];
 }
 
 export default function CycleHistoryModal({
@@ -32,10 +40,12 @@ export default function CycleHistoryModal({
   transactions,
   currentCycleRange,
   paychecks,
+  categories,
   onClose,
 }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const rows = useMemo<CycleRow[]>(() => {
     const cycleOptions = getAvailableCycles(transactions, currentCycleRange);
@@ -52,16 +62,24 @@ export default function CycleHistoryModal({
           if (isBorrowTransaction(t)) return sum - borrowSignedAmount(t);
           return sum + t.amount;
         }, 0);
-      // Same exclusions as "Total spent so far" — real spending only, no transfers.
-      const spent = cycleTxs
-        .filter(
-          (t) =>
-            !isSavingsTransaction(t) &&
-            !isCreditPurchase(t) &&
-            !isLendingTransaction(t) &&
-            !isBorrowTransaction(t)
+      // Same category-spend totals Summary shows for the current cycle — savings, lending, and
+      // borrowing are transfers, not spending, and a credit purchase hasn't left your hand yet.
+      const categoryTotals = new Map<string, number>();
+      for (const t of cycleTxs) {
+        if (
+          isSavingsTransaction(t) ||
+          isCreditPurchase(t) ||
+          isLendingTransaction(t) ||
+          isBorrowTransaction(t)
         )
-        .reduce((sum, t) => sum + t.amount, 0);
+          continue;
+        categoryTotals.set(t.category, (categoryTotals.get(t.category) ?? 0) + t.amount);
+      }
+      const breakdown = categories
+        .map((meta) => ({ meta, amount: categoryTotals.get(meta.key) ?? 0 }))
+        .filter((r) => r.amount > 0)
+        .sort((a, b) => b.amount - a.amount);
+      const spent = breakdown.reduce((sum, r) => sum + r.amount, 0);
       const paycheck = paychecks[opt.identifier] ?? null;
       const remaining = paycheck !== null ? paycheck - outflow : null;
       return {
@@ -71,9 +89,10 @@ export default function CycleHistoryModal({
         paycheck,
         spent,
         remaining,
+        breakdown,
       };
     });
-  }, [transactions, currentCycleRange, paychecks]);
+  }, [transactions, currentCycleRange, paychecks, categories]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -92,50 +111,88 @@ export default function CycleHistoryModal({
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-            {rows.map((row) => (
-              <View key={row.identifier} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={styles.cardTitleRow}>
-                    <Text style={styles.cardLabel}>{row.label}</Text>
-                    {row.isCurrent && (
-                      <View style={styles.currentBadge}>
-                        <Text style={styles.currentBadgeText}>Current</Text>
-                      </View>
-                    )}
+            {rows.map((row) => {
+              const isExpanded = expandedId === row.identifier;
+              const remainingPhrase =
+                row.remaining === null
+                  ? null
+                  : row.remaining < 0
+                    ? "You went over your paycheck by"
+                    : row.isCurrent
+                      ? "You have this much left so far"
+                      : 'You had this much left over';
+              return (
+                <TouchableOpacity
+                  key={row.identifier}
+                  style={styles.card}
+                  onPress={() => setExpandedId(isExpanded ? null : row.identifier)}
+                >
+                  <View style={styles.cardTop}>
+                    <View style={styles.cardTitleRow}>
+                      <Text style={styles.cardLabel}>{row.label}</Text>
+                      {row.isCurrent && (
+                        <View style={styles.currentBadge}>
+                          <Text style={styles.currentBadgeText}>Current</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.cardTopRight}>
+                      {row.remaining !== null ? (
+                        <Text
+                          style={[
+                            styles.remainingValue,
+                            row.remaining < 0 && styles.remainingNegative,
+                          ]}
+                        >
+                          {formatPeso(Math.abs(row.remaining))}
+                        </Text>
+                      ) : (
+                        <Text style={styles.noPaycheckValue}>No paycheck set</Text>
+                      )}
+                      <Text style={styles.chevron}>{isExpanded ? '▾' : '▸'}</Text>
+                    </View>
                   </View>
-                  {row.remaining !== null ? (
-                    <Text
-                      style={[styles.remainingValue, row.remaining < 0 && styles.remainingNegative]}
-                    >
-                      {formatPeso(row.remaining)}
-                    </Text>
-                  ) : (
-                    <Text style={styles.noPaycheckValue}>No paycheck set</Text>
+                  {remainingPhrase && <Text style={styles.cardSubLabel}>{remainingPhrase}</Text>}
+
+                  <View style={styles.statRow}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Paycheck</Text>
+                      <Text style={styles.statValue}>
+                        {row.paycheck !== null ? formatPeso(row.paycheck) : '—'}
+                      </Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>You spent</Text>
+                      <Text style={styles.statValue}>{formatPeso(row.spent)}</Text>
+                    </View>
+                  </View>
+
+                  {isExpanded && (
+                    <View style={styles.breakdownList}>
+                      {row.breakdown.length === 0 ? (
+                        <Text style={styles.breakdownEmpty}>Nothing spent this cycle yet.</Text>
+                      ) : (
+                        row.breakdown.map((r) => {
+                          const pct = row.spent > 0 ? (r.amount / row.spent) * 100 : 0;
+                          return (
+                            <View key={r.meta.key} style={styles.breakdownRow}>
+                              <View style={styles.breakdownLeft}>
+                                <Text style={styles.breakdownIcon}>{r.meta.icon}</Text>
+                                <Text style={styles.breakdownLabel}>{r.meta.label}</Text>
+                              </View>
+                              <View style={styles.breakdownRight}>
+                                <Text style={styles.breakdownAmount}>{formatPeso(r.amount)}</Text>
+                                <Text style={styles.breakdownPct}>{pct.toFixed(0)}%</Text>
+                              </View>
+                            </View>
+                          );
+                        })
+                      )}
+                    </View>
                   )}
-                </View>
-                <Text style={styles.cardSubLabel}>
-                  {row.remaining !== null
-                    ? row.remaining < 0
-                      ? 'Over the paycheck'
-                      : row.isCurrent
-                        ? 'Remaining so far'
-                        : 'Left at cycle end'
-                    : ' '}
-                </Text>
-                <View style={styles.statRow}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>PAYCHECK</Text>
-                    <Text style={styles.statValue}>
-                      {row.paycheck !== null ? formatPeso(row.paycheck) : '—'}
-                    </Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>SPENT</Text>
-                    <Text style={styles.statValue}>{formatPeso(row.spent)}</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         )}
       </SafeAreaView>
@@ -187,18 +244,34 @@ const createStyles = (theme: AppTheme) =>
       paddingVertical: 2,
     },
     currentBadgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
+    cardTopRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     remainingValue: { fontSize: 16, fontWeight: '800', color: theme.text },
     remainingNegative: { color: theme.danger },
     noPaycheckValue: { fontSize: 12.5, fontWeight: '600', color: theme.textMuted },
-    cardSubLabel: { fontSize: 11, color: theme.textMuted, marginTop: 2, marginBottom: 10 },
+    chevron: { fontSize: 12, color: theme.textMuted },
+    cardSubLabel: { fontSize: 12, color: theme.textMuted, marginTop: 2, marginBottom: 10 },
     statRow: { flexDirection: 'row', gap: 24 },
     statItem: {},
     statLabel: {
-      fontSize: 10,
-      fontWeight: '700',
+      fontSize: 11.5,
+      fontWeight: '600',
       color: theme.textMuted,
-      letterSpacing: 0.5,
       marginBottom: 2,
     },
     statValue: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    breakdownList: {
+      marginTop: 14,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 10,
+    },
+    breakdownEmpty: { fontSize: 12.5, color: theme.textMuted },
+    breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    breakdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    breakdownIcon: { fontSize: 15 },
+    breakdownLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
+    breakdownRight: { alignItems: 'flex-end' },
+    breakdownAmount: { fontSize: 13, fontWeight: '700', color: theme.text },
+    breakdownPct: { fontSize: 10.5, color: theme.textMuted, marginTop: 1 },
   });
