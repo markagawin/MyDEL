@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CycleRange, Transaction } from '../types';
 import { CategoryMeta } from '../categories';
 import { formatPeso } from '../currency';
+import { endOfDay, parseCycleIdentifier, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
 import { isSavingsTransaction, savingsSignedAmount } from '../savings';
 import { isCreditPurchase } from '../creditCard';
@@ -50,7 +51,17 @@ export default function CycleHistoryModal({
   const rows = useMemo<CycleRow[]>(() => {
     const cycleOptions = getAvailableCycles(transactions, currentCycleRange);
     return cycleOptions.map((opt) => {
-      const cycleTxs = transactions.filter((t) => t.cycleIdentifier === opt.identifier);
+      // Group by the cycle's actual date range rather than trusting each transaction's stored
+      // cycleIdentifier — that field can drift out of sync with its real date (e.g. after a
+      // past payday-settings change), which would silently lump unrelated transactions into
+      // the wrong cycle here.
+      const cycleRange = parseCycleIdentifier(opt.identifier);
+      const fromTime = startOfDay(cycleRange.start).getTime();
+      const toTime = endOfDay(cycleRange.end).getTime();
+      const cycleTxs = transactions.filter((t) => {
+        const time = new Date(t.timestamp).getTime();
+        return time >= fromTime && time <= toTime;
+      });
       // Same net-outflow math the QuickLog banner uses for "Remaining of paycheck": a credit
       // purchase hasn't left your hand yet, savings/lending/borrowing are transfers whose sign
       // depends on direction, everything else is a plain expense.
