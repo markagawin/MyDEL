@@ -8,8 +8,8 @@ import { endOfDay, parseCycleIdentifier, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
 import { isSavingsTransaction, savingsSignedAmount } from '../savings';
 import { isCreditPurchase } from '../creditCard';
-import { isLendingTransaction, lendingSignedAmount } from '../lending';
-import { isBorrowTransaction, borrowSignedAmount } from '../borrow';
+import { isLendingTransaction, lendingActionOf, lendingSignedAmount } from '../lending';
+import { borrowActionOf, isBorrowTransaction, borrowSignedAmount } from '../borrow';
 import { AppTheme, useTheme } from '../theme';
 
 interface Props {
@@ -26,6 +26,12 @@ interface CategoryAmount {
   amount: number;
 }
 
+interface TransferAmount {
+  icon: string;
+  label: string;
+  amount: number;
+}
+
 interface CycleRow {
   identifier: string;
   label: string;
@@ -34,6 +40,7 @@ interface CycleRow {
   spent: number;
   remaining: number | null;
   breakdown: CategoryAmount[];
+  transfers: TransferAmount[];
 }
 
 export default function CycleHistoryModal({
@@ -93,6 +100,28 @@ export default function CycleHistoryModal({
       const spent = breakdown.reduce((sum, r) => sum + r.amount, 0);
       const paycheck = paychecks[opt.identifier] ?? null;
       const remaining = paycheck !== null ? paycheck - outflow : null;
+
+      // Borrowing and lending don't show up in the category breakdown above (they're transfers,
+      // not spending), so surface them here instead whenever this cycle actually had any.
+      let borrowed = 0;
+      let paidBack = 0;
+      let lent = 0;
+      let repaid = 0;
+      for (const t of cycleTxs) {
+        if (isBorrowTransaction(t)) {
+          if (borrowActionOf(t) === 'paid_back') paidBack += t.amount;
+          else borrowed += t.amount;
+        } else if (isLendingTransaction(t)) {
+          if (lendingActionOf(t) === 'repaid') repaid += t.amount;
+          else lent += t.amount;
+        }
+      }
+      const transfers: TransferAmount[] = [];
+      if (borrowed > 0) transfers.push({ icon: '📥', label: 'Borrowed', amount: borrowed });
+      if (paidBack > 0) transfers.push({ icon: '💸', label: 'Paid back', amount: paidBack });
+      if (lent > 0) transfers.push({ icon: '🤝', label: 'Lent', amount: lent });
+      if (repaid > 0) transfers.push({ icon: '💵', label: 'Repaid', amount: repaid });
+
       return {
         identifier: opt.identifier,
         label: opt.label,
@@ -101,6 +130,7 @@ export default function CycleHistoryModal({
         spent,
         remaining,
         breakdown,
+        transfers,
       };
     });
   }, [transactions, currentCycleRange, paychecks, categories]);
@@ -180,24 +210,38 @@ export default function CycleHistoryModal({
 
                   {isExpanded && (
                     <View style={styles.breakdownList}>
-                      {row.breakdown.length === 0 ? (
-                        <Text style={styles.breakdownEmpty}>Nothing spent this cycle yet.</Text>
+                      {row.transfers.length === 0 && row.breakdown.length === 0 ? (
+                        <Text style={styles.breakdownEmpty}>Nothing logged this cycle yet.</Text>
                       ) : (
-                        row.breakdown.map((r) => {
-                          const pct = row.spent > 0 ? (r.amount / row.spent) * 100 : 0;
-                          return (
-                            <View key={r.meta.key} style={styles.breakdownRow}>
+                        <>
+                          {row.transfers.map((t) => (
+                            <View key={t.label} style={styles.breakdownRow}>
                               <View style={styles.breakdownLeft}>
-                                <Text style={styles.breakdownIcon}>{r.meta.icon}</Text>
-                                <Text style={styles.breakdownLabel}>{r.meta.label}</Text>
+                                <Text style={styles.breakdownIcon}>{t.icon}</Text>
+                                <Text style={styles.breakdownLabel}>{t.label}</Text>
                               </View>
-                              <View style={styles.breakdownRight}>
-                                <Text style={styles.breakdownAmount}>{formatPeso(r.amount)}</Text>
-                                <Text style={styles.breakdownPct}>{pct.toFixed(0)}%</Text>
-                              </View>
+                              <Text style={styles.breakdownAmount}>{formatPeso(t.amount)}</Text>
                             </View>
-                          );
-                        })
+                          ))}
+                          {row.transfers.length > 0 && row.breakdown.length > 0 && (
+                            <View style={styles.breakdownDivider} />
+                          )}
+                          {row.breakdown.map((r) => {
+                            const pct = row.spent > 0 ? (r.amount / row.spent) * 100 : 0;
+                            return (
+                              <View key={r.meta.key} style={styles.breakdownRow}>
+                                <View style={styles.breakdownLeft}>
+                                  <Text style={styles.breakdownIcon}>{r.meta.icon}</Text>
+                                  <Text style={styles.breakdownLabel}>{r.meta.label}</Text>
+                                </View>
+                                <View style={styles.breakdownRight}>
+                                  <Text style={styles.breakdownAmount}>{formatPeso(r.amount)}</Text>
+                                  <Text style={styles.breakdownPct}>{pct.toFixed(0)}%</Text>
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </>
                       )}
                     </View>
                   )}
@@ -278,6 +322,7 @@ const createStyles = (theme: AppTheme) =>
       gap: 10,
     },
     breakdownEmpty: { fontSize: 12.5, color: theme.textMuted },
+    breakdownDivider: { height: 1, backgroundColor: theme.border },
     breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     breakdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     breakdownIcon: { fontSize: 15 },
