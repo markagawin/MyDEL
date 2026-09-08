@@ -216,40 +216,43 @@ export default function CycleHistoryModal({
                     </View>
                   </View>
 
+                  {/* Always visible (not behind the tap) — these are exactly the pieces that
+                      make up "Remaining" beyond plain spending, so it stays understandable
+                      without expanding. */}
+                  {row.transfers.length > 0 && (
+                    <View style={styles.transferList}>
+                      {row.transfers.map((t) => (
+                        <View key={t.label} style={styles.breakdownRow}>
+                          <View style={styles.breakdownLeft}>
+                            <Text style={styles.breakdownIcon}>{t.icon}</Text>
+                            <Text style={styles.breakdownLabel}>{t.label}</Text>
+                          </View>
+                          <Text style={styles.breakdownAmount}>{formatPeso(t.amount)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
                   {isExpanded && (
                     <View style={styles.breakdownList}>
-                      {row.transfers.length === 0 && row.breakdown.length === 0 ? (
-                        <Text style={styles.breakdownEmpty}>Nothing logged this cycle yet.</Text>
+                      {row.breakdown.length === 0 ? (
+                        <Text style={styles.breakdownEmpty}>Nothing spent this cycle yet.</Text>
                       ) : (
-                        <>
-                          {row.transfers.map((t) => (
-                            <View key={t.label} style={styles.breakdownRow}>
+                        row.breakdown.map((r) => {
+                          const pct = row.spent > 0 ? (r.amount / row.spent) * 100 : 0;
+                          return (
+                            <View key={r.meta.key} style={styles.breakdownRow}>
                               <View style={styles.breakdownLeft}>
-                                <Text style={styles.breakdownIcon}>{t.icon}</Text>
-                                <Text style={styles.breakdownLabel}>{t.label}</Text>
+                                <Text style={styles.breakdownIcon}>{r.meta.icon}</Text>
+                                <Text style={styles.breakdownLabel}>{r.meta.label}</Text>
                               </View>
-                              <Text style={styles.breakdownAmount}>{formatPeso(t.amount)}</Text>
+                              <View style={styles.breakdownRight}>
+                                <Text style={styles.breakdownAmount}>{formatPeso(r.amount)}</Text>
+                                <Text style={styles.breakdownPct}>{pct.toFixed(0)}%</Text>
+                              </View>
                             </View>
-                          ))}
-                          {row.transfers.length > 0 && row.breakdown.length > 0 && (
-                            <View style={styles.breakdownDivider} />
-                          )}
-                          {row.breakdown.map((r) => {
-                            const pct = row.spent > 0 ? (r.amount / row.spent) * 100 : 0;
-                            return (
-                              <View key={r.meta.key} style={styles.breakdownRow}>
-                                <View style={styles.breakdownLeft}>
-                                  <Text style={styles.breakdownIcon}>{r.meta.icon}</Text>
-                                  <Text style={styles.breakdownLabel}>{r.meta.label}</Text>
-                                </View>
-                                <View style={styles.breakdownRight}>
-                                  <Text style={styles.breakdownAmount}>{formatPeso(r.amount)}</Text>
-                                  <Text style={styles.breakdownPct}>{pct.toFixed(0)}%</Text>
-                                </View>
-                              </View>
-                            );
-                          })}
-                        </>
+                          );
+                        })
                       )}
                     </View>
                   )}
@@ -322,6 +325,10 @@ const createStyles = (theme: AppTheme) =>
       marginBottom: 2,
     },
     statValue: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    transferList: {
+      marginTop: 12,
+      gap: 8,
+    },
     breakdownList: {
       marginTop: 14,
       paddingTop: 12,
@@ -330,7 +337,6 @@ const createStyles = (theme: AppTheme) =>
       gap: 10,
     },
     breakdownEmpty: { fontSize: 12.5, color: theme.textMuted },
-    breakdownDivider: { height: 1, backgroundColor: theme.border },
     breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     breakdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     breakdownIcon: { fontSize: 15 },
