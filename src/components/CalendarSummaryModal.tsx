@@ -6,7 +6,7 @@ import { CategoryMeta, UNKNOWN_CATEGORY } from '../categories';
 import { formatPeso, formatPesoCompact } from '../currency';
 import { formatFullDate, formatTimeOfDay, sameDay, toIsoDateOnly } from '../cycleEngine';
 import { isSavingsTransaction, savingsActionOf } from '../savings';
-import { isCreditPurchase } from '../creditCard';
+import { isCreditCardPayment, isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
 import { isBorrowTransaction } from '../borrow';
 import { AppTheme, useTheme } from '../theme';
@@ -47,14 +47,17 @@ export default function CalendarSummaryModal({
   // Savings deposits/withdrawals, lending, and borrowing are transfers, not spending, and a
   // credit card purchase hasn't left your hand yet — so all four are excluded from every total
   // here (the day cells, the month total, and the day-detail total), even though the entry itself
-  // still shows up in that day's transaction list below. A "Pay Credit Card" entry counts
-  // normally, since that's the moment the cash actually leaves.
+  // still shows up in that day's transaction list below. A credit card *payment* is real cash
+  // leaving your hand — it still reduces the paycheck (Quick Log) and the card balance (Credit
+  // Card modal) — but as a lump sum it would otherwise dominate a single day's total here, so it's
+  // excluded too; it's still fully itemized in its own Credit Card summary.
   const totalsByDay = useMemo(() => {
     const map = new Map<string, number>();
     for (const tx of transactions) {
       if (
         isSavingsTransaction(tx) ||
         isCreditPurchase(tx) ||
+        isCreditCardPayment(tx) ||
         isLendingTransaction(tx) ||
         isBorrowTransaction(tx)
       )
@@ -111,6 +114,7 @@ export default function CalendarSummaryModal({
           (t) =>
             !isSavingsTransaction(t) &&
             !isCreditPurchase(t) &&
+            !isCreditCardPayment(t) &&
             !isLendingTransaction(t) &&
             !isBorrowTransaction(t)
         )
@@ -127,6 +131,7 @@ export default function CalendarSummaryModal({
           t.cycleIdentifier === currentCycleRange.identifier &&
           !isSavingsTransaction(t) &&
           !isCreditPurchase(t) &&
+          !isCreditCardPayment(t) &&
           !isLendingTransaction(t) &&
           !isBorrowTransaction(t)
       )
