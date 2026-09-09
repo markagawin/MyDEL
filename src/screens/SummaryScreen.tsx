@@ -18,7 +18,7 @@ import CreditCardSummaryModal from '../components/CreditCardSummaryModal';
 import BorrowSummaryModal from '../components/BorrowSummaryModal';
 import CycleHistoryModal from '../components/CycleHistoryModal';
 import { isSavingsTransaction } from '../savings';
-import { isCreditPurchase } from '../creditCard';
+import { isCreditCardPayment, isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
 import { isBorrowTransaction } from '../borrow';
 import { CategoryKey, Transaction } from '../types';
@@ -93,12 +93,16 @@ export default function SummaryScreen() {
     for (const tx of transactions) {
       // Savings, lending, and borrowing are transfers, not spending — they show in their own
       // dedicated summary cards/modals instead of the category breakdown. A credit card purchase
-      // hasn't left your hand yet, so it's excluded here too — it only counts once you actually
-      // pay the card, at which point that "Pay Credit Card" entry counts under its own category.
+      // hasn't left your hand yet, so it's excluded here too. A credit card *payment* is real cash
+      // leaving your hand and still reduces the paycheck (Quick Log) and the card balance (Credit
+      // Card modal) — but as a lump sum it would otherwise dominate this category breakdown and
+      // "Highest Spend", so it's excluded here as well; it's still fully itemized in its own
+      // Credit Card summary.
       if (
         !inRange(tx) ||
         isSavingsTransaction(tx) ||
         isCreditPurchase(tx) ||
+        isCreditCardPayment(tx) ||
         isLendingTransaction(tx) ||
         isBorrowTransaction(tx)
       )
@@ -121,7 +125,7 @@ export default function SummaryScreen() {
     for (const tx of transactions) {
       // Keep this in sync with the exclusions in `breakdown` above, so an expanded category's
       // entries always sum to the total shown on its row.
-      if (!inRange(tx) || isCreditPurchase(tx)) continue;
+      if (!inRange(tx) || isCreditPurchase(tx) || isCreditCardPayment(tx)) continue;
       if (!map.has(tx.category)) map.set(tx.category, []);
       map.get(tx.category)!.push(tx);
     }
