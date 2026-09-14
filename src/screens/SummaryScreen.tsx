@@ -39,6 +39,9 @@ export default function SummaryScreen() {
     totalLent,
     totalBorrowed,
     totalLeftover,
+    leftoverWithdrawals,
+    addLeftoverWithdrawal,
+    removeLeftoverWithdrawal,
     borrowers,
     savingsGoals,
     addSavingsGoal,
@@ -413,6 +416,9 @@ export default function SummaryScreen() {
         transactions={transactions}
         currentCycleRange={currentCycleRange}
         paychecks={paychecks}
+        leftoverWithdrawals={leftoverWithdrawals}
+        onAddWithdrawal={addLeftoverWithdrawal}
+        onRemoveWithdrawal={removeLeftoverWithdrawal}
         onClose={() => setLeftoverVisible(false)}
       />
     </SafeAreaView>

@@ -28,6 +28,15 @@ export interface SavingsGoal {
   name: string;
 }
 
+/** Money drawn out of the Leftover Budget pool (unspent balances from past pay cycles) — not
+ * tied to any one cycle, so it lives outside the normal transaction/category system. */
+export interface LeftoverWithdrawal {
+  id: string;
+  amount: number;
+  timestamp: string; // ISO string
+  note?: string;
+}
+
 export interface Transaction {
   id: string;
   amount: number;
@@ -82,4 +91,5 @@ export interface BackupData {
   profilePhotoUri?: string | null;
   borrowers?: Borrower[];
   savingsGoals?: SavingsGoal[];
+  leftoverWithdrawals?: LeftoverWithdrawal[];
 }

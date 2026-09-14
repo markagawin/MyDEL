@@ -1,5 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Borrower, CustomCategory, CycleSettings, RecurringEntry, SavingsGoal, Transaction } from './types';
+import {
+  Borrower,
+  CustomCategory,
+  CycleSettings,
+  LeftoverWithdrawal,
+  RecurringEntry,
+  SavingsGoal,
+  Transaction,
+} from './types';
 
 const TRANSACTIONS_KEY = '@mydel/transactions';
 const SETTINGS_KEY = '@mydel/settings';
@@ -13,6 +21,7 @@ const PROFILE_PHOTO_KEY = '@mydel/profilePhoto';
 const BANNER_VIEW_KEY = '@mydel/bannerView';
 const BORROWERS_KEY = '@mydel/borrowers';
 const SAVINGS_GOALS_KEY = '@mydel/savingsGoals';
+const LEFTOVER_WITHDRAWALS_KEY = '@mydel/leftoverWithdrawals';
 
 export interface BannerViewState {
   cycleIdentifier: string;
@@ -176,4 +185,18 @@ export async function loadSavingsGoals(): Promise<SavingsGoal[]> {
 
 export async function saveSavingsGoals(goals: SavingsGoal[]): Promise<void> {
   await AsyncStorage.setItem(SAVINGS_GOALS_KEY, JSON.stringify(goals));
+}
+
+export async function loadLeftoverWithdrawals(): Promise<LeftoverWithdrawal[]> {
+  const raw = await AsyncStorage.getItem(LEFTOVER_WITHDRAWALS_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as LeftoverWithdrawal[];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveLeftoverWithdrawals(withdrawals: LeftoverWithdrawal[]): Promise<void> {
+  await AsyncStorage.setItem(LEFTOVER_WITHDRAWALS_KEY, JSON.stringify(withdrawals));
 }

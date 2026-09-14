@@ -1,16 +1,22 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CycleRange, Transaction } from '../types';
+import { CycleRange, LeftoverWithdrawal, Transaction } from '../types';
 import { formatPeso } from '../currency';
+import { formatFullDate, formatTimeOfDay } from '../cycleEngine';
 import { computePastCycleRemainings, computeTotalLeftover } from '../cycleFinance';
 import { AppTheme, useTheme } from '../theme';
+import LeftoverWithdrawModal, { LeftoverWithdrawSubmission } from './LeftoverWithdrawModal';
+import Toast from './Toast';
 
 interface Props {
   visible: boolean;
   transactions: Transaction[];
   currentCycleRange: CycleRange;
   paychecks: Record<string, number>;
+  leftoverWithdrawals: LeftoverWithdrawal[];
+  onAddWithdrawal: (amount: number, note?: string, date?: Date) => string;
+  onRemoveWithdrawal: (id: string) => void;
   onClose: () => void;
 }
 
@@ -19,16 +25,61 @@ export default function LeftoverSummaryModal({
   transactions,
   currentCycleRange,
   paychecks,
+  leftoverWithdrawals,
+  onAddWithdrawal,
+  onRemoveWithdrawal,
   onClose,
 }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [withdrawVisible, setWithdrawVisible] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastUndoId, setToastUndoId] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const rows = useMemo(
     () => computePastCycleRemainings(transactions, paychecks, currentCycleRange),
     [transactions, paychecks, currentCycleRange]
   );
-  const total = useMemo(() => computeTotalLeftover(rows), [rows]);
+  const grossTotal = useMemo(() => computeTotalLeftover(rows), [rows]);
+  const withdrawnTotal = useMemo(
+    () => leftoverWithdrawals.reduce((sum, w) => sum + w.amount, 0),
+    [leftoverWithdrawals]
+  );
+  const total = grossTotal - withdrawnTotal;
+
+  const sortedWithdrawals = useMemo(
+    () =>
+      [...leftoverWithdrawals].sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      ),
+    [leftoverWithdrawals]
+  );
+
+  const showToast = (message: string, undoId: string | null) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(message);
+    setToastUndoId(undoId);
+    setToastVisible(true);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastVisible(false);
+      setToastUndoId(null);
+    }, 2200);
+  };
+
+  const handleWithdraw = (data: LeftoverWithdrawSubmission) => {
+    const newId = onAddWithdrawal(data.amount, data.note, data.date);
+    setWithdrawVisible(false);
+    showToast(`${formatPeso(data.amount)} withdrawn from leftover budget`, newId);
+  };
+
+  const handleUndo = () => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    if (toastUndoId) onRemoveWithdrawal(toastUndoId);
+    setToastVisible(false);
+    setToastUndoId(null);
+  };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -51,35 +102,74 @@ export default function LeftoverSummaryModal({
               ? 'No ended pay cycles with a paycheck set yet'
               : `Unspent across ${rows.length} past pay ${rows.length === 1 ? 'cycle' : 'cycles'}`}
           </Text>
+          <TouchableOpacity style={styles.withdrawButton} onPress={() => setWithdrawVisible(true)}>
+            <Text style={styles.withdrawButtonText}>Withdraw</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.explainer}>
           Money you didn't spend in a past cycle doesn't carry into the next one's paycheck — it's
           just sitting there. This adds it all up so you can treat it as extra budget on top of
           your current cycle. Only counts cycles that have ended and had a paycheck set; a cycle
-          you went over shows as a negative.
+          you went over shows as a negative. Withdraw from it when you actually spend some.
         </Text>
 
-        {rows.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              Once a pay cycle ends with a paycheck set, it'll show up here.
-            </Text>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0 }}>
-            {rows.map((row) => (
-              <View key={row.identifier} style={styles.row}>
-                <Text style={styles.rowLabel}>{row.label}</Text>
-                <Text style={[styles.rowAmount, row.remaining < 0 && styles.rowAmountNegative]}>
-                  {row.remaining < 0 ? '− ' : ''}
-                  {formatPeso(Math.abs(row.remaining))}
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-        )}
+        <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0 }}>
+          {sortedWithdrawals.length > 0 && (
+            <>
+              <Text style={styles.sectionHeading}>WITHDRAWALS</Text>
+              {sortedWithdrawals.map((w) => (
+                <View key={w.id} style={styles.row}>
+                  <View style={styles.rowMiddle}>
+                    <Text style={styles.rowLabel}>{w.note?.trim() || 'Withdrawal'}</Text>
+                    <Text style={styles.rowTime}>
+                      {formatFullDate(new Date(w.timestamp))} · {formatTimeOfDay(new Date(w.timestamp))}
+                    </Text>
+                  </View>
+                  <Text style={styles.rowAmountNegative}>− {formatPeso(w.amount)}</Text>
+                  <TouchableOpacity
+                    accessibilityLabel="Delete withdrawal"
+                    style={styles.deleteButton}
+                    onPress={() => onRemoveWithdrawal(w.id)}
+                  >
+                    <Text style={styles.deleteIcon}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+
+          {rows.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>
+                Once a pay cycle ends with a paycheck set, it'll show up here.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.sectionHeading}>PAST CYCLES</Text>
+              {rows.map((row) => (
+                <View key={row.identifier} style={styles.row}>
+                  <Text style={styles.rowLabel}>{row.label}</Text>
+                  <Text style={[styles.rowAmount, row.remaining < 0 && styles.rowAmountNegative]}>
+                    {row.remaining < 0 ? '− ' : ''}
+                    {formatPeso(Math.abs(row.remaining))}
+                  </Text>
+                </View>
+              ))}
+            </>
+          )}
+        </ScrollView>
       </SafeAreaView>
+
+      <LeftoverWithdrawModal
+        visible={withdrawVisible}
+        availableToWithdraw={total}
+        onSubmit={handleWithdraw}
+        onClose={() => setWithdrawVisible(false)}
+      />
+
+      <Toast visible={toastVisible} message={toastMessage} onUndo={handleUndo} />
     </Modal>
   );
 }
@@ -116,6 +206,14 @@ const createStyles = (theme: AppTheme) =>
     totalValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
     totalValueNegative: { color: '#FF9B9B' },
     totalHint: { color: '#9FB2D6', fontSize: 11.5, marginTop: 6, textAlign: 'center' },
+    withdrawButton: {
+      marginTop: 14,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 24,
+    },
+    withdrawButtonText: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '700' },
     explainer: {
       fontSize: 12,
       color: theme.textMuted,
@@ -124,8 +222,16 @@ const createStyles = (theme: AppTheme) =>
       marginTop: 14,
       marginBottom: 6,
     },
-    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+    emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40 },
     emptyText: { color: theme.textMuted, fontSize: 14, textAlign: 'center' },
+    sectionHeading: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.textMuted,
+      letterSpacing: 0.5,
+      marginTop: 8,
+      marginBottom: 8,
+    },
     row: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -138,7 +244,11 @@ const createStyles = (theme: AppTheme) =>
       paddingHorizontal: 16,
       marginBottom: 10,
     },
+    rowMiddle: { flex: 1, marginRight: 8 },
     rowLabel: { fontSize: 13.5, fontWeight: '600', color: theme.text },
+    rowTime: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
     rowAmount: { fontSize: 14.5, fontWeight: '700', color: theme.success },
-    rowAmountNegative: { color: theme.danger },
+    rowAmountNegative: { fontSize: 14.5, fontWeight: '700', color: theme.danger },
+    deleteButton: { marginLeft: 12, padding: 4 },
+    deleteIcon: { fontSize: 15 },
   });

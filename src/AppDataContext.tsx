@@ -14,6 +14,7 @@ import {
   CustomCategory,
   CycleRange,
   CycleSettings,
+  LeftoverWithdrawal,
   LendingAction,
   PaymentMethod,
   RecurringEntry,
@@ -31,6 +32,7 @@ import {
   DEFAULT_SETTINGS,
   loadBorrowers,
   loadCustomCategories,
+  loadLeftoverWithdrawals,
   loadPaychecks,
   loadProfileName,
   loadProfilePhoto,
@@ -41,6 +43,7 @@ import {
   loadTransactions,
   saveBorrowers,
   saveCustomCategories,
+  saveLeftoverWithdrawals,
   savePaychecks,
   saveProfileName,
   saveProfilePhoto,
@@ -79,6 +82,7 @@ interface AppDataContextValue {
   recurringEntries: RecurringEntry[];
   borrowers: Borrower[];
   savingsGoals: SavingsGoal[];
+  leftoverWithdrawals: LeftoverWithdrawal[];
   profileName: string;
   profilePhotoUri: string | null;
   setProfileName: (name: string) => Promise<void>;
@@ -123,6 +127,8 @@ interface AppDataContextValue {
   addSavingsGoal: (name: string) => string;
   renameSavingsGoal: (id: string, name: string) => Promise<void>;
   removeSavingsGoal: (id: string) => Promise<void>;
+  addLeftoverWithdrawal: (amount: number, note?: string, date?: Date) => string;
+  removeLeftoverWithdrawal: (id: string) => Promise<void>;
   exportBackup: () => BackupData;
   restoreFromBackup: (data: BackupData) => Promise<void>;
 }
@@ -154,6 +160,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [recurringEntries, setRecurringEntries] = useState<RecurringEntry[]>([]);
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [leftoverWithdrawals, setLeftoverWithdrawals] = useState<LeftoverWithdrawal[]>([]);
   const [profileName, setProfileNameState] = useState('');
   const [profilePhotoUri, setProfilePhotoUriState] = useState<string | null>(null);
 
@@ -170,6 +177,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         storedProfilePhoto,
         storedBorrowers,
         storedSavingsGoals,
+        storedLeftoverWithdrawals,
       ] = await Promise.all([
         loadTransactions(),
         loadSettings(),
@@ -181,6 +189,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         loadProfilePhoto(),
         loadBorrowers(),
         loadSavingsGoals(),
+        loadLeftoverWithdrawals(),
       ]);
       setTransactions(tx);
       setSettings(s);
@@ -191,6 +200,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setProfilePhotoUriState(storedProfilePhoto);
       setBorrowers(storedBorrowers);
       setSavingsGoals(storedSavingsGoals);
+      setLeftoverWithdrawals(storedLeftoverWithdrawals);
       if (trackingStart) {
         setTrackingStartDate(trackingStart);
       } else {
@@ -534,6 +544,40 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addLeftoverWithdrawal = useCallback((amount: number, note?: string, date?: Date): string => {
+    const picked = date ?? new Date();
+    const now = new Date();
+    const timestamp = new Date(
+      picked.getFullYear(),
+      picked.getMonth(),
+      picked.getDate(),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    );
+    const withdrawal: LeftoverWithdrawal = {
+      id: generateId(),
+      amount,
+      timestamp: timestamp.toISOString(),
+      note,
+    };
+    setLeftoverWithdrawals((prev) => {
+      const next = [...prev, withdrawal];
+      saveLeftoverWithdrawals(next);
+      return next;
+    });
+    return withdrawal.id;
+  }, []);
+
+  const removeLeftoverWithdrawal = useCallback(async (id: string) => {
+    setLeftoverWithdrawals((prev) => {
+      const next = prev.filter((w) => w.id !== id);
+      saveLeftoverWithdrawals(next);
+      return next;
+    });
+  }, []);
+
   const setProfileName = useCallback(async (name: string) => {
     setProfileNameState(name);
     await saveProfileName(name);
@@ -558,6 +602,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       profilePhotoUri,
       borrowers,
       savingsGoals,
+      leftoverWithdrawals,
     }),
     [
       transactions,
@@ -570,6 +615,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       profilePhotoUri,
       borrowers,
       savingsGoals,
+      leftoverWithdrawals,
     ]
   );
 
@@ -583,6 +629,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const nextProfilePhotoUri = data.profilePhotoUri ?? null;
     const nextBorrowers = data.borrowers ?? [];
     const nextSavingsGoals = data.savingsGoals ?? [];
+    const nextLeftoverWithdrawals = data.leftoverWithdrawals ?? [];
 
     await Promise.all([
       saveTransactions(nextTransactions),
@@ -595,6 +642,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       data.trackingStartDate ? saveTrackingStartDate(data.trackingStartDate) : Promise.resolve(),
       saveBorrowers(nextBorrowers),
       saveSavingsGoals(nextSavingsGoals),
+      saveLeftoverWithdrawals(nextLeftoverWithdrawals),
     ]);
 
     setTransactions(nextTransactions);
@@ -607,6 +655,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     if (data.trackingStartDate) setTrackingStartDate(data.trackingStartDate);
     setBorrowers(nextBorrowers);
     setSavingsGoals(nextSavingsGoals);
+    setLeftoverWithdrawals(nextLeftoverWithdrawals);
   }, []);
 
   const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
@@ -614,10 +663,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const totalLent = useMemo(() => computeTotalLent(transactions), [transactions]);
   const lentByBorrower = useMemo(() => computeLentByBorrower(transactions), [transactions]);
   const totalBorrowed = useMemo(() => computeTotalBorrowed(transactions), [transactions]);
-  const totalLeftover = useMemo(
-    () => computeTotalLeftover(computePastCycleRemainings(transactions, paychecks, currentCycleRange)),
-    [transactions, paychecks, currentCycleRange]
-  );
+  const totalLeftover = useMemo(() => {
+    const gross = computeTotalLeftover(computePastCycleRemainings(transactions, paychecks, currentCycleRange));
+    const withdrawn = leftoverWithdrawals.reduce((sum, w) => sum + w.amount, 0);
+    return gross - withdrawn;
+  }, [transactions, paychecks, currentCycleRange, leftoverWithdrawals]);
 
   const value: AppDataContextValue = {
     loading,
@@ -638,6 +688,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     recurringEntries,
     borrowers,
     savingsGoals,
+    leftoverWithdrawals,
     profileName,
     profilePhotoUri,
     setProfileName,
@@ -657,6 +708,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     addSavingsGoal,
     renameSavingsGoal,
     removeSavingsGoal,
+    addLeftoverWithdrawal,
+    removeLeftoverWithdrawal,
     exportBackup,
     restoreFromBackup,
   };
