@@ -6,8 +6,10 @@ import { useAppData } from '../AppDataContext';
 import { formatPeso } from '../currency';
 import { endOfDay, formatShortDate, formatTimeOfDay, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
+import { computeCycleOutflowTrend } from '../cycleFinance';
 import { AppTheme, useTheme } from '../theme';
 import DonutChart from '../components/DonutChart';
+import SpendingTrendChart from '../components/SpendingTrendChart';
 import CyclePickerModal from '../components/CyclePickerModal';
 import CustomRangeBar from '../components/CustomRangeBar';
 import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
@@ -141,6 +143,11 @@ export default function SummaryScreen() {
     return map;
   }, [transactions, inRange]);
 
+  const trendPoints = useMemo(
+    () => computeCycleOutflowTrend(transactions, currentCycleRange, 6),
+    [transactions, currentCycleRange]
+  );
+
   const highest = breakdown.rows[0];
   const selected = selectedCategory
     ? breakdown.rows.find((r) => r.meta.key === selectedCategory)
@@ -243,6 +250,8 @@ export default function SummaryScreen() {
             <Text style={styles.highlightLabel}>No spending logged yet</Text>
           </View>
         )}
+
+        <SpendingTrendChart points={trendPoints} />
 
         <View style={styles.chartWrap}>
           <DonutChart

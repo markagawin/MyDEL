@@ -63,3 +63,37 @@ export function computePastCycleRemainings(
 export function computeTotalLeftover(rows: CycleRemainingRow[]): number {
   return rows.reduce((sum, r) => sum + r.remaining, 0);
 }
+
+export interface CycleOutflowPoint {
+  identifier: string;
+  start: Date;
+  outflow: number;
+  isCurrent: boolean;
+}
+
+/** Total outflow for the most recent cycles (current cycle included), oldest first so it plots
+ * left-to-right as a trend. */
+export function computeCycleOutflowTrend(
+  transactions: Transaction[],
+  currentCycleRange: CycleRange,
+  maxCycles: number = 6
+): CycleOutflowPoint[] {
+  const points = getAvailableCycles(transactions, currentCycleRange)
+    .slice(0, maxCycles)
+    .map((opt) => {
+      const cycleRange = parseCycleIdentifier(opt.identifier);
+      const fromTime = startOfDay(cycleRange.start).getTime();
+      const toTime = endOfDay(cycleRange.end).getTime();
+      const cycleTxs = transactions.filter((t) => {
+        const time = new Date(t.timestamp).getTime();
+        return time >= fromTime && time <= toTime;
+      });
+      return {
+        identifier: opt.identifier,
+        start: cycleRange.start,
+        outflow: computeCycleOutflow(cycleTxs),
+        isCurrent: opt.isCurrent,
+      };
+    });
+  return points.reverse();
+}
