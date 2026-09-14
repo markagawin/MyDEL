@@ -203,45 +203,32 @@ export default function SummaryScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-        <TouchableOpacity style={styles.savingsCard} onPress={() => setSavingsVisible(true)}>
-          <View>
-            <Text style={styles.savingsLabel}>💰 Total Saved</Text>
-            <Text style={styles.savingsHint}>Deposits and withdrawals, all time</Text>
-          </View>
-          <Text style={styles.savingsValue}>{formatPeso(totalSaved)}</Text>
-        </TouchableOpacity>
+        <View style={styles.balanceGrid}>
+          <TouchableOpacity style={styles.balanceTile} onPress={() => setSavingsVisible(true)}>
+            <Text style={styles.balanceTileLabel}>💰 Total Saved</Text>
+            <Text style={styles.balanceTileValue}>{formatPeso(totalSaved)}</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.savingsCard} onPress={() => setCreditCardVisible(true)}>
-          <View>
-            <Text style={styles.savingsLabel}>💳 Credit Card Owed</Text>
-            <Text style={styles.savingsHint}>Purchases minus payments, all time</Text>
-          </View>
-          <Text style={styles.savingsValue}>{formatPeso(creditCardBalance)}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.balanceTile} onPress={() => setCreditCardVisible(true)}>
+            <Text style={styles.balanceTileLabel}>💳 Credit Card Owed</Text>
+            <Text style={styles.balanceTileValue}>{formatPeso(creditCardBalance)}</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.savingsCard} onPress={() => setLendingVisible(true)}>
-          <View>
-            <Text style={styles.savingsLabel}>🤝 Money Lent Out</Text>
-            <Text style={styles.savingsHint}>Across everyone, all time</Text>
-          </View>
-          <Text style={styles.savingsValue}>{formatPeso(totalLent)}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.balanceTile} onPress={() => setLendingVisible(true)}>
+            <Text style={styles.balanceTileLabel}>🤝 Money Lent Out</Text>
+            <Text style={styles.balanceTileValue}>{formatPeso(totalLent)}</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.savingsCard} onPress={() => setBorrowVisible(true)}>
-          <View>
-            <Text style={styles.savingsLabel}>📥 Money Borrowed</Text>
-            <Text style={styles.savingsHint}>Across everyone, all time</Text>
-          </View>
-          <Text style={styles.savingsValue}>{formatPeso(totalBorrowed)}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.balanceTile} onPress={() => setBorrowVisible(true)}>
+            <Text style={styles.balanceTileLabel}>📥 Money Borrowed</Text>
+            <Text style={styles.balanceTileValue}>{formatPeso(totalBorrowed)}</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.savingsCard} onPress={() => setLeftoverVisible(true)}>
-          <View>
-            <Text style={styles.savingsLabel}>🧮 Leftover Budget</Text>
-            <Text style={styles.savingsHint}>Unspent from past pay cycles</Text>
-          </View>
-          <Text style={styles.savingsValue}>{formatPeso(totalLeftover)}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.balanceTile} onPress={() => setLeftoverVisible(true)}>
+            <Text style={styles.balanceTileLabel}>🧮 Leftover Budget</Text>
+            <Text style={styles.balanceTileValue}>{formatPeso(totalLeftover)}</Text>
+          </TouchableOpacity>
+        </View>
 
         {highest ? (
           <View style={styles.highlightCard}>
@@ -469,20 +456,23 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   filterText: { fontSize: 13, fontWeight: '600', color: theme.text, marginRight: 6 },
   filterChevron: { fontSize: 12, color: theme.textMuted },
-  savingsCard: {
+  balanceGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 4,
+  },
+  balanceTile: {
+    width: '48%',
     backgroundColor: theme.card,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
   },
-  savingsLabel: { fontSize: 14, fontWeight: '700', color: theme.text },
-  savingsHint: { fontSize: 11.5, color: theme.textMuted, marginTop: 2 },
-  savingsValue: { fontSize: 18, fontWeight: '800', color: theme.navy },
+  balanceTileLabel: { fontSize: 12, fontWeight: '700', color: theme.text, marginBottom: 8 },
+  balanceTileValue: { fontSize: 16, fontWeight: '800', color: theme.navy },
   highlightCard: {
     backgroundColor: theme.navy,
     borderRadius: 16,
