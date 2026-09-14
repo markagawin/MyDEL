@@ -17,6 +17,7 @@ import LendingSummaryModal from '../components/LendingSummaryModal';
 import CreditCardSummaryModal from '../components/CreditCardSummaryModal';
 import BorrowSummaryModal from '../components/BorrowSummaryModal';
 import CycleHistoryModal from '../components/CycleHistoryModal';
+import LeftoverSummaryModal from '../components/LeftoverSummaryModal';
 import { isSavingsTransaction } from '../savings';
 import { isCreditCardPayment, isCreditPurchase } from '../creditCard';
 import { isLendingTransaction } from '../lending';
@@ -37,6 +38,7 @@ export default function SummaryScreen() {
     creditCardBalance,
     totalLent,
     totalBorrowed,
+    totalLeftover,
     borrowers,
     savingsGoals,
     addSavingsGoal,
@@ -54,6 +56,7 @@ export default function SummaryScreen() {
   const [creditCardVisible, setCreditCardVisible] = useState(false);
   const [borrowVisible, setBorrowVisible] = useState(false);
   const [cycleHistoryVisible, setCycleHistoryVisible] = useState(false);
+  const [leftoverVisible, setLeftoverVisible] = useState(false);
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
 
@@ -229,6 +232,14 @@ export default function SummaryScreen() {
           <Text style={styles.savingsValue}>{formatPeso(totalBorrowed)}</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.savingsCard} onPress={() => setLeftoverVisible(true)}>
+          <View>
+            <Text style={styles.savingsLabel}>🧮 Leftover Budget</Text>
+            <Text style={styles.savingsHint}>Unspent from past pay cycles</Text>
+          </View>
+          <Text style={styles.savingsValue}>{formatPeso(totalLeftover)}</Text>
+        </TouchableOpacity>
+
         {highest ? (
           <View style={styles.highlightCard}>
             <Text style={styles.highlightLabel}>Highest Spend</Text>
@@ -395,6 +406,14 @@ export default function SummaryScreen() {
         paychecks={paychecks}
         categories={categories}
         onClose={() => setCycleHistoryVisible(false)}
+      />
+
+      <LeftoverSummaryModal
+        visible={leftoverVisible}
+        transactions={transactions}
+        currentCycleRange={currentCycleRange}
+        paychecks={paychecks}
+        onClose={() => setLeftoverVisible(false)}
       />
     </SafeAreaView>
   );

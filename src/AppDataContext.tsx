@@ -25,6 +25,7 @@ import { computeTotalSaved, SAVINGS_CATEGORY_KEY } from './savings';
 import { computeCreditCardBalance } from './creditCard';
 import { computeLentByBorrower, computeTotalLent, LENDING_CATEGORY_KEY } from './lending';
 import { computeTotalBorrowed, BORROW_CATEGORY_KEY } from './borrow';
+import { computePastCycleRemainings, computeTotalLeftover } from './cycleFinance';
 import { CATEGORIES, CATEGORY_MAP, CategoryMeta } from './categories';
 import {
   DEFAULT_SETTINGS,
@@ -72,6 +73,7 @@ interface AppDataContextValue {
   totalLent: number;
   lentByBorrower: Record<string, number>;
   totalBorrowed: number;
+  totalLeftover: number;
   categories: CategoryMeta[];
   categoryMap: Record<string, CategoryMeta>;
   recurringEntries: RecurringEntry[];
@@ -612,6 +614,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const totalLent = useMemo(() => computeTotalLent(transactions), [transactions]);
   const lentByBorrower = useMemo(() => computeLentByBorrower(transactions), [transactions]);
   const totalBorrowed = useMemo(() => computeTotalBorrowed(transactions), [transactions]);
+  const totalLeftover = useMemo(
+    () => computeTotalLeftover(computePastCycleRemainings(transactions, paychecks, currentCycleRange)),
+    [transactions, paychecks, currentCycleRange]
+  );
 
   const value: AppDataContextValue = {
     loading,
@@ -626,6 +632,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     totalLent,
     lentByBorrower,
     totalBorrowed,
+    totalLeftover,
     categories,
     categoryMap,
     recurringEntries,
