@@ -33,11 +33,17 @@ export interface CycleRemainingRow {
 
 /** Remaining for every cycle that has already ended and had a paycheck set — the current,
  * still-in-progress cycle is excluded since its remaining is already tracked live in Quick Log,
- * and a cycle with no paycheck has nothing defined to be "left over". Newest first. */
+ * and a cycle with no paycheck has nothing defined to be "left over". Newest first.
+ *
+ * Adds back any Leftover Budget withdrawal that landed in that same cycle: a withdrawal already
+ * gets subtracted once via the running withdrawn total (see computeTotalLeftover), so a past
+ * cycle that spent into a withdrawal-boosted budget must not also come back negative here —
+ * otherwise the same withdrawal would be subtracted from the pool twice once that cycle closes. */
 export function computePastCycleRemainings(
   transactions: Transaction[],
   paychecks: Record<string, number>,
-  currentCycleRange: CycleRange
+  currentCycleRange: CycleRange,
+  leftoverWithdrawals: LeftoverWithdrawal[]
 ): CycleRemainingRow[] {
   const rows: CycleRemainingRow[] = [];
   for (const opt of getAvailableCycles(transactions, currentCycleRange)) {
@@ -51,10 +57,15 @@ export function computePastCycleRemainings(
       const time = new Date(t.timestamp).getTime();
       return time >= fromTime && time <= toTime;
     });
+    const withdrawnInCycle = computeLeftoverWithdrawnInRange(
+      leftoverWithdrawals,
+      cycleRange.start,
+      cycleRange.end
+    );
     rows.push({
       identifier: opt.identifier,
       label: opt.label,
-      remaining: computeCycleRemaining(cycleTxs, paycheck),
+      remaining: computeCycleRemaining(cycleTxs, paycheck) + withdrawnInCycle,
     });
   }
   return rows;

@@ -664,7 +664,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const lentByBorrower = useMemo(() => computeLentByBorrower(transactions), [transactions]);
   const totalBorrowed = useMemo(() => computeTotalBorrowed(transactions), [transactions]);
   const totalLeftover = useMemo(() => {
-    const gross = computeTotalLeftover(computePastCycleRemainings(transactions, paychecks, currentCycleRange));
+    const gross = computeTotalLeftover(
+      computePastCycleRemainings(transactions, paychecks, currentCycleRange, leftoverWithdrawals)
+    );
     const withdrawn = leftoverWithdrawals.reduce((sum, w) => sum + w.amount, 0);
     return gross - withdrawn;
   }, [transactions, paychecks, currentCycleRange, leftoverWithdrawals]);

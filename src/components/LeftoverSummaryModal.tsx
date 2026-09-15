@@ -39,8 +39,8 @@ export default function LeftoverSummaryModal({
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const rows = useMemo(
-    () => computePastCycleRemainings(transactions, paychecks, currentCycleRange),
-    [transactions, paychecks, currentCycleRange]
+    () => computePastCycleRemainings(transactions, paychecks, currentCycleRange, leftoverWithdrawals),
+    [transactions, paychecks, currentCycleRange, leftoverWithdrawals]
   );
   const grossTotal = useMemo(() => computeTotalLeftover(rows), [rows]);
   const withdrawnTotal = useMemo(
