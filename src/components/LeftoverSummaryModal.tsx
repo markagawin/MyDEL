@@ -5,6 +5,7 @@ import { CycleRange, LeftoverWithdrawal, Transaction } from '../types';
 import { formatPeso } from '../currency';
 import { formatFullDate, formatTimeOfDay } from '../cycleEngine';
 import { computePastCycleRemainings, computeTotalLeftover } from '../cycleFinance';
+import { leftoverActionOf, leftoverSignedAmount } from '../leftover';
 import { AppTheme, useTheme } from '../theme';
 import LeftoverWithdrawModal, { LeftoverWithdrawSubmission } from './LeftoverWithdrawModal';
 import Toast from './Toast';
@@ -16,6 +17,7 @@ interface Props {
   paychecks: Record<string, number>;
   leftoverWithdrawals: LeftoverWithdrawal[];
   onAddWithdrawal: (amount: number, note?: string, date?: Date) => string;
+  onAddReturn: (amount: number, note?: string, date?: Date) => string;
   onRemoveWithdrawal: (id: string) => void;
   onClose: () => void;
 }
@@ -27,12 +29,13 @@ export default function LeftoverSummaryModal({
   paychecks,
   leftoverWithdrawals,
   onAddWithdrawal,
+  onAddReturn,
   onRemoveWithdrawal,
   onClose,
 }: Props) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [withdrawVisible, setWithdrawVisible] = useState(false);
+  const [entryModalMode, setEntryModalMode] = useState<'withdraw' | 'return' | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastUndoId, setToastUndoId] = useState<string | null>(null);
@@ -43,11 +46,11 @@ export default function LeftoverSummaryModal({
     [transactions, paychecks, currentCycleRange, leftoverWithdrawals]
   );
   const grossTotal = useMemo(() => computeTotalLeftover(rows), [rows]);
-  const withdrawnTotal = useMemo(
-    () => leftoverWithdrawals.reduce((sum, w) => sum + w.amount, 0),
+  const netWithdrawn = useMemo(
+    () => leftoverWithdrawals.reduce((sum, w) => sum + leftoverSignedAmount(w), 0),
     [leftoverWithdrawals]
   );
-  const total = grossTotal - withdrawnTotal;
+  const total = grossTotal - netWithdrawn;
 
   const sortedWithdrawals = useMemo(
     () =>
@@ -68,10 +71,16 @@ export default function LeftoverSummaryModal({
     }, 2200);
   };
 
-  const handleWithdraw = (data: LeftoverWithdrawSubmission) => {
-    const newId = onAddWithdrawal(data.amount, data.note, data.date);
-    setWithdrawVisible(false);
-    showToast(`${formatPeso(data.amount)} withdrawn from leftover budget`, newId);
+  const handleEntrySubmit = (data: LeftoverWithdrawSubmission) => {
+    if (entryModalMode === 'return') {
+      const newId = onAddReturn(data.amount, data.note, data.date);
+      setEntryModalMode(null);
+      showToast(`${formatPeso(data.amount)} returned to leftover budget`, newId);
+    } else {
+      const newId = onAddWithdrawal(data.amount, data.note, data.date);
+      setEntryModalMode(null);
+      showToast(`${formatPeso(data.amount)} withdrawn from leftover budget`, newId);
+    }
   };
 
   const handleUndo = () => {
@@ -102,40 +111,62 @@ export default function LeftoverSummaryModal({
               ? 'No ended pay cycles with a paycheck set yet'
               : `Unspent across ${rows.length} past pay ${rows.length === 1 ? 'cycle' : 'cycles'}`}
           </Text>
-          <TouchableOpacity style={styles.withdrawButton} onPress={() => setWithdrawVisible(true)}>
-            <Text style={styles.withdrawButtonText}>Withdraw</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtonRow}>
+            <TouchableOpacity
+              style={styles.withdrawButton}
+              onPress={() => setEntryModalMode('withdraw')}
+            >
+              <Text style={styles.withdrawButtonText}>Withdraw</Text>
+            </TouchableOpacity>
+            {netWithdrawn > 0 && (
+              <TouchableOpacity
+                style={styles.withdrawButton}
+                onPress={() => setEntryModalMode('return')}
+              >
+                <Text style={styles.withdrawButtonText}>Return</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         <Text style={styles.explainer}>
           Money you didn't spend in a past cycle doesn't carry into the next one's paycheck — it's
           just sitting there. This adds it all up so you can treat it as extra budget on top of
           your current cycle. Only counts cycles that have ended and had a paycheck set; a cycle
-          you went over shows as a negative. Withdraw from it when you actually spend some.
+          you went over shows as a negative. Withdraw from it when you actually spend some, or
+          return money you took out but didn't end up needing.
         </Text>
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0 }}>
           {sortedWithdrawals.length > 0 && (
             <>
-              <Text style={styles.sectionHeading}>WITHDRAWALS</Text>
-              {sortedWithdrawals.map((w) => (
-                <View key={w.id} style={styles.row}>
-                  <View style={styles.rowMiddle}>
-                    <Text style={styles.rowLabel}>{w.note?.trim() || 'Withdrawal'}</Text>
-                    <Text style={styles.rowTime}>
-                      {formatFullDate(new Date(w.timestamp))} · {formatTimeOfDay(new Date(w.timestamp))}
+              <Text style={styles.sectionHeading}>ACTIVITY</Text>
+              {sortedWithdrawals.map((w) => {
+                const isReturn = leftoverActionOf(w) === 'return';
+                return (
+                  <View key={w.id} style={styles.row}>
+                    <View style={styles.rowMiddle}>
+                      <Text style={styles.rowLabel}>
+                        {w.note?.trim() || (isReturn ? 'Return' : 'Withdrawal')}
+                      </Text>
+                      <Text style={styles.rowTime}>
+                        {formatFullDate(new Date(w.timestamp))} · {formatTimeOfDay(new Date(w.timestamp))}
+                      </Text>
+                    </View>
+                    <Text style={isReturn ? styles.rowAmount : styles.rowAmountNegative}>
+                      {isReturn ? '+ ' : '− '}
+                      {formatPeso(w.amount)}
                     </Text>
+                    <TouchableOpacity
+                      accessibilityLabel={isReturn ? 'Delete return' : 'Delete withdrawal'}
+                      style={styles.deleteButton}
+                      onPress={() => onRemoveWithdrawal(w.id)}
+                    >
+                      <Text style={styles.deleteIcon}>🗑️</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={styles.rowAmountNegative}>− {formatPeso(w.amount)}</Text>
-                  <TouchableOpacity
-                    accessibilityLabel="Delete withdrawal"
-                    style={styles.deleteButton}
-                    onPress={() => onRemoveWithdrawal(w.id)}
-                  >
-                    <Text style={styles.deleteIcon}>🗑️</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+                );
+              })}
             </>
           )}
 
@@ -163,10 +194,12 @@ export default function LeftoverSummaryModal({
       </SafeAreaView>
 
       <LeftoverWithdrawModal
-        visible={withdrawVisible}
+        visible={entryModalMode !== null}
+        mode={entryModalMode ?? 'withdraw'}
         availableToWithdraw={total}
-        onSubmit={handleWithdraw}
-        onClose={() => setWithdrawVisible(false)}
+        totalWithdrawnSoFar={netWithdrawn}
+        onSubmit={handleEntrySubmit}
+        onClose={() => setEntryModalMode(null)}
       />
 
       <Toast visible={toastVisible} message={toastMessage} onUndo={handleUndo} />
@@ -206,8 +239,12 @@ const createStyles = (theme: AppTheme) =>
     totalValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
     totalValueNegative: { color: '#FF9B9B' },
     totalHint: { color: '#9FB2D6', fontSize: 11.5, marginTop: 6, textAlign: 'center' },
-    withdrawButton: {
+    actionButtonRow: {
+      flexDirection: 'row',
+      gap: 10,
       marginTop: 14,
+    },
+    withdrawButton: {
       backgroundColor: 'rgba(255,255,255,0.15)',
       borderRadius: 12,
       paddingVertical: 10,

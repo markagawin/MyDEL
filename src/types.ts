@@ -28,13 +28,17 @@ export interface SavingsGoal {
   name: string;
 }
 
-/** Money drawn out of the Leftover Budget pool (unspent balances from past pay cycles) — not
- * tied to any one cycle, so it lives outside the normal transaction/category system. */
+/** 'withdrawal' takes money out of the Leftover Budget pool; 'return' puts some back. */
+export type LeftoverAction = 'withdrawal' | 'return';
+
+/** Money moved into or out of the Leftover Budget pool (unspent balances from past pay cycles) —
+ * not tied to any one cycle, so it lives outside the normal transaction/category system. */
 export interface LeftoverWithdrawal {
   id: string;
   amount: number;
   timestamp: string; // ISO string
   note?: string;
+  action?: LeftoverAction; // undefined (entries logged before 'return' existed) means 'withdrawal'
 }
 
 export interface Transaction {

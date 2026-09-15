@@ -123,7 +123,8 @@ export default function CycleHistoryModal({
       }
 
       // A Leftover Budget withdrawal isn't spending — it's money moved from that pool into
-      // whichever cycle's date range it falls in, topping up that cycle's own paycheck budget.
+      // whichever cycle's date range it falls in, topping up that cycle's own paycheck budget. A
+      // return moves the opposite direction, so this can come out negative too.
       const leftoverWithdrawn = computeLeftoverWithdrawnInRange(
         leftoverWithdrawals,
         cycleRange.start,
@@ -150,6 +151,13 @@ export default function CycleHistoryModal({
           label: 'From Leftover Budget',
           amount: leftoverWithdrawn,
           sign: 1,
+        });
+      else if (leftoverWithdrawn < 0)
+        equationLines.push({
+          icon: '🧮',
+          label: 'Returned to Leftover Budget',
+          amount: -leftoverWithdrawn,
+          sign: -1,
         });
       if (savingsDeposit > 0)
         equationLines.push({ icon: '💰', label: 'Saved', amount: savingsDeposit, sign: -1 });

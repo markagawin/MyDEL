@@ -14,6 +14,7 @@ import {
   CustomCategory,
   CycleRange,
   CycleSettings,
+  LeftoverAction,
   LeftoverWithdrawal,
   LendingAction,
   PaymentMethod,
@@ -27,6 +28,7 @@ import { computeCreditCardBalance } from './creditCard';
 import { computeLentByBorrower, computeTotalLent, LENDING_CATEGORY_KEY } from './lending';
 import { computeTotalBorrowed, BORROW_CATEGORY_KEY } from './borrow';
 import { computePastCycleRemainings, computeTotalLeftover } from './cycleFinance';
+import { leftoverSignedAmount } from './leftover';
 import { CATEGORIES, CATEGORY_MAP, CategoryMeta } from './categories';
 import {
   DEFAULT_SETTINGS,
@@ -128,6 +130,7 @@ interface AppDataContextValue {
   renameSavingsGoal: (id: string, name: string) => Promise<void>;
   removeSavingsGoal: (id: string) => Promise<void>;
   addLeftoverWithdrawal: (amount: number, note?: string, date?: Date) => string;
+  addLeftoverReturn: (amount: number, note?: string, date?: Date) => string;
   removeLeftoverWithdrawal: (id: string) => Promise<void>;
   exportBackup: () => BackupData;
   restoreFromBackup: (data: BackupData) => Promise<void>;
@@ -544,31 +547,47 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const addLeftoverWithdrawal = useCallback((amount: number, note?: string, date?: Date): string => {
-    const picked = date ?? new Date();
-    const now = new Date();
-    const timestamp = new Date(
-      picked.getFullYear(),
-      picked.getMonth(),
-      picked.getDate(),
-      now.getHours(),
-      now.getMinutes(),
-      now.getSeconds(),
-      now.getMilliseconds()
-    );
-    const withdrawal: LeftoverWithdrawal = {
-      id: generateId(),
-      amount,
-      timestamp: timestamp.toISOString(),
-      note,
-    };
-    setLeftoverWithdrawals((prev) => {
-      const next = [...prev, withdrawal];
-      saveLeftoverWithdrawals(next);
-      return next;
-    });
-    return withdrawal.id;
-  }, []);
+  const addLeftoverEntry = useCallback(
+    (action: LeftoverAction, amount: number, note?: string, date?: Date): string => {
+      const picked = date ?? new Date();
+      const now = new Date();
+      const timestamp = new Date(
+        picked.getFullYear(),
+        picked.getMonth(),
+        picked.getDate(),
+        now.getHours(),
+        now.getMinutes(),
+        now.getSeconds(),
+        now.getMilliseconds()
+      );
+      const entry: LeftoverWithdrawal = {
+        id: generateId(),
+        amount,
+        timestamp: timestamp.toISOString(),
+        note,
+        action,
+      };
+      setLeftoverWithdrawals((prev) => {
+        const next = [...prev, entry];
+        saveLeftoverWithdrawals(next);
+        return next;
+      });
+      return entry.id;
+    },
+    []
+  );
+
+  const addLeftoverWithdrawal = useCallback(
+    (amount: number, note?: string, date?: Date): string =>
+      addLeftoverEntry('withdrawal', amount, note, date),
+    [addLeftoverEntry]
+  );
+
+  const addLeftoverReturn = useCallback(
+    (amount: number, note?: string, date?: Date): string =>
+      addLeftoverEntry('return', amount, note, date),
+    [addLeftoverEntry]
+  );
 
   const removeLeftoverWithdrawal = useCallback(async (id: string) => {
     setLeftoverWithdrawals((prev) => {
@@ -667,8 +686,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const gross = computeTotalLeftover(
       computePastCycleRemainings(transactions, paychecks, currentCycleRange, leftoverWithdrawals)
     );
-    const withdrawn = leftoverWithdrawals.reduce((sum, w) => sum + w.amount, 0);
-    return gross - withdrawn;
+    const netWithdrawn = leftoverWithdrawals.reduce((sum, w) => sum + leftoverSignedAmount(w), 0);
+    return gross - netWithdrawn;
   }, [transactions, paychecks, currentCycleRange, leftoverWithdrawals]);
 
   const value: AppDataContextValue = {
@@ -711,6 +730,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     renameSavingsGoal,
     removeSavingsGoal,
     addLeftoverWithdrawal,
+    addLeftoverReturn,
     removeLeftoverWithdrawal,
     exportBackup,
     restoreFromBackup,

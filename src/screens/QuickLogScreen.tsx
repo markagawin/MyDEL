@@ -258,7 +258,8 @@ export default function QuickLogScreen() {
 
   // A Leftover Budget withdrawal isn't spending — it's you moving money from that pool into this
   // cycle's spendable budget, so it tops up the paycheck itself rather than counting as outflow.
-  const leftoverWithdrawnThisCycle = useMemo(
+  // A return does the opposite (money moved back into the pool), so this can go negative too.
+  const leftoverNetThisCycle = useMemo(
     () =>
       computeLeftoverWithdrawnInRange(
         leftoverWithdrawals,
@@ -268,7 +269,7 @@ export default function QuickLogScreen() {
     [leftoverWithdrawals, currentCycleRange]
   );
   const effectivePaycheck =
-    currentPaycheck !== null ? currentPaycheck + leftoverWithdrawnThisCycle : null;
+    currentPaycheck !== null ? currentPaycheck + leftoverNetThisCycle : null;
 
   const remaining = effectivePaycheck !== null ? effectivePaycheck - periodTotal : null;
   const pctSpent =
@@ -522,10 +523,16 @@ export default function QuickLogScreen() {
                               effectivePaycheck!
                             )} paycheck`}
                       </Text>
-                      {leftoverWithdrawnThisCycle > 0 && (
+                      {leftoverNetThisCycle > 0 && (
                         <Text style={styles.bannerLeftoverNote}>
-                          🧮 Includes {formatPeso(leftoverWithdrawnThisCycle)} withdrawn from
-                          Leftover Budget
+                          🧮 Includes {formatPeso(leftoverNetThisCycle)} withdrawn from Leftover
+                          Budget
+                        </Text>
+                      )}
+                      {leftoverNetThisCycle < 0 && (
+                        <Text style={styles.bannerLeftoverNote}>
+                          🧮 {formatPeso(Math.abs(leftoverNetThisCycle))} returned to Leftover
+                          Budget this cycle
                         </Text>
                       )}
                       <View style={styles.progressTrack}>

@@ -14,14 +14,18 @@ export interface LeftoverWithdrawSubmission {
 
 interface Props {
   visible: boolean;
+  mode: 'withdraw' | 'return';
   availableToWithdraw: number;
+  totalWithdrawnSoFar: number;
   onSubmit: (data: LeftoverWithdrawSubmission) => void;
   onClose: () => void;
 }
 
 export default function LeftoverWithdrawModal({
   visible,
+  mode,
   availableToWithdraw,
+  totalWithdrawnSoFar,
   onSubmit,
   onClose,
 }: Props) {
@@ -41,9 +45,11 @@ export default function LeftoverWithdrawModal({
     }
   }, [visible]);
 
+  const isReturn = mode === 'return';
   const amountValue = parseFloat(amountText);
   const hasValidAmount = !Number.isNaN(amountValue) && amountValue > 0;
-  const canSubmit = hasValidAmount;
+  const exceedsWithdrawn = isReturn && hasValidAmount && amountValue > totalWithdrawnSoFar;
+  const canSubmit = hasValidAmount && !exceedsWithdrawn;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -56,18 +62,27 @@ export default function LeftoverWithdrawModal({
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={styles.sheet} onPress={() => {}} onStartShouldSetResponder={() => true}>
             <View style={styles.header}>
-              <Text style={styles.title}>Withdraw</Text>
+              <Text style={styles.title}>{isReturn ? 'Return' : 'Withdraw'}</Text>
               <TouchableOpacity accessibilityLabel="Close" onPress={onClose} style={styles.headerButton}>
                 <Text style={styles.headerButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <Text style={styles.balanceLine}>
-              🧮 Available to withdraw: {formatPeso(availableToWithdraw)}
+              {isReturn
+                ? `🧮 Withdrawn so far: ${formatPeso(totalWithdrawnSoFar)}`
+                : `🧮 Available to withdraw: ${formatPeso(availableToWithdraw)}`}
             </Text>
             <Text style={styles.hint}>
-              This tops up the current cycle's "Remaining of paycheck" in Quick Log.
+              {isReturn
+                ? "This reduces the current cycle's \"Remaining of paycheck\" in Quick Log."
+                : "This tops up the current cycle's \"Remaining of paycheck\" in Quick Log."}
             </Text>
+            {exceedsWithdrawn && (
+              <Text style={styles.warning}>
+                👇 Can't return more than you've withdrawn
+              </Text>
+            )}
 
             <Text style={styles.fieldLabel}>AMOUNT</Text>
             <View style={styles.amountWrap}>
@@ -107,7 +122,7 @@ export default function LeftoverWithdrawModal({
               disabled={!canSubmit}
               onPress={handleSubmit}
             >
-              <Text style={styles.actionButtonText}>Withdraw</Text>
+              <Text style={styles.actionButtonText}>{isReturn ? 'Return' : 'Withdraw'}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -158,6 +173,13 @@ const createStyles = (theme: AppTheme) =>
       fontSize: 11.5,
       color: theme.textMuted,
       marginBottom: 14,
+    },
+    warning: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.danger,
+      marginBottom: 14,
+      marginTop: -6,
     },
     fieldLabel: {
       fontSize: 11,

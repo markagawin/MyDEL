@@ -43,6 +43,7 @@ export default function SummaryScreen() {
     totalLeftover,
     leftoverWithdrawals,
     addLeftoverWithdrawal,
+    addLeftoverReturn,
     removeLeftoverWithdrawal,
     borrowers,
     savingsGoals,
@@ -415,6 +416,7 @@ export default function SummaryScreen() {
         paychecks={paychecks}
         leftoverWithdrawals={leftoverWithdrawals}
         onAddWithdrawal={addLeftoverWithdrawal}
+        onAddReturn={addLeftoverReturn}
         onRemoveWithdrawal={removeLeftoverWithdrawal}
         onClose={() => setLeftoverVisible(false)}
       />
