@@ -65,6 +65,9 @@ export default function LeftoverWithdrawModal({
             <Text style={styles.balanceLine}>
               🧮 Available to withdraw: {formatPeso(availableToWithdraw)}
             </Text>
+            <Text style={styles.hint}>
+              This tops up the current cycle's "Remaining of paycheck" in Quick Log.
+            </Text>
 
             <Text style={styles.fieldLabel}>AMOUNT</Text>
             <View style={styles.amountWrap}>
@@ -148,6 +151,11 @@ const createStyles = (theme: AppTheme) =>
     balanceLine: {
       fontSize: 12.5,
       fontWeight: '600',
+      color: theme.textMuted,
+      marginBottom: 4,
+    },
+    hint: {
+      fontSize: 11.5,
       color: theme.textMuted,
       marginBottom: 14,
     },

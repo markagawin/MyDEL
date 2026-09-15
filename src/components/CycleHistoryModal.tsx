@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CycleRange, Transaction } from '../types';
+import { CycleRange, LeftoverWithdrawal, Transaction } from '../types';
 import { CategoryMeta } from '../categories';
 import { formatPeso } from '../currency';
 import { endOfDay, parseCycleIdentifier, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
+import { computeLeftoverWithdrawnInRange } from '../cycleFinance';
 import { isSavingsTransaction, savingsActionOf } from '../savings';
 import { isCreditPurchase } from '../creditCard';
 import { isLendingTransaction, lendingActionOf } from '../lending';
@@ -18,6 +19,7 @@ interface Props {
   currentCycleRange: CycleRange;
   paychecks: Record<string, number>;
   categories: CategoryMeta[];
+  leftoverWithdrawals: LeftoverWithdrawal[];
   onClose: () => void;
 }
 
@@ -53,6 +55,7 @@ export default function CycleHistoryModal({
   currentCycleRange,
   paychecks,
   categories,
+  leftoverWithdrawals,
   onClose,
 }: Props) {
   const theme = useTheme();
@@ -119,6 +122,14 @@ export default function CycleHistoryModal({
         }
       }
 
+      // A Leftover Budget withdrawal isn't spending — it's money moved from that pool into
+      // whichever cycle's date range it falls in, topping up that cycle's own paycheck budget.
+      const leftoverWithdrawn = computeLeftoverWithdrawnInRange(
+        leftoverWithdrawals,
+        cycleRange.start,
+        cycleRange.end
+      );
+
       const remaining =
         paychecks[opt.identifier] !== undefined
           ? paychecks[opt.identifier] -
@@ -128,10 +139,18 @@ export default function CycleHistoryModal({
             lent +
             repaid +
             borrowed -
-            paidBack
+            paidBack +
+            leftoverWithdrawn
           : null;
 
       const equationLines: EquationLine[] = [{ icon: '🧾', label: 'Spent', amount: spent, sign: -1 }];
+      if (leftoverWithdrawn > 0)
+        equationLines.push({
+          icon: '🧮',
+          label: 'From Leftover Budget',
+          amount: leftoverWithdrawn,
+          sign: 1,
+        });
       if (savingsDeposit > 0)
         equationLines.push({ icon: '💰', label: 'Saved', amount: savingsDeposit, sign: -1 });
       if (savingsWithdrawal > 0)
@@ -161,7 +180,7 @@ export default function CycleHistoryModal({
         chargedToCard,
       };
     });
-  }, [transactions, currentCycleRange, paychecks, categories]);
+  }, [transactions, currentCycleRange, paychecks, categories, leftoverWithdrawals]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>

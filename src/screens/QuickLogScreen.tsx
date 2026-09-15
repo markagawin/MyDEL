@@ -24,6 +24,7 @@ import { CREDIT_CARD_CATEGORY_KEY, computeCreditCardBalance, isCreditPurchase } 
 import { LENDING_CATEGORY_KEY, isLendingTransaction, lendingSignedAmount } from '../lending';
 import { BORROW_CATEGORY_KEY, borrowSignedAmount, isBorrowTransaction } from '../borrow';
 import { loadBannerViewState, saveBannerViewState } from '../storage';
+import { computeLeftoverWithdrawnInRange } from '../cycleFinance';
 import { AppTheme, useTheme } from '../theme';
 import PaycheckModal from '../components/PaycheckModal';
 import AddCategoryModal from '../components/AddCategoryModal';
@@ -54,6 +55,7 @@ export default function QuickLogScreen() {
     addSavingsGoal,
     profileName,
     profilePhotoUri,
+    leftoverWithdrawals,
   } = useAppData();
   const [amountText, setAmountText] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
@@ -254,9 +256,25 @@ export default function QuickLogScreen() {
   const creditCardBalance = useMemo(() => computeCreditCardBalance(transactions), [transactions]);
   const totalSaved = useMemo(() => computeTotalSaved(transactions), [transactions]);
 
-  const remaining = currentPaycheck !== null ? currentPaycheck - periodTotal : null;
+  // A Leftover Budget withdrawal isn't spending — it's you moving money from that pool into this
+  // cycle's spendable budget, so it tops up the paycheck itself rather than counting as outflow.
+  const leftoverWithdrawnThisCycle = useMemo(
+    () =>
+      computeLeftoverWithdrawnInRange(
+        leftoverWithdrawals,
+        currentCycleRange.start,
+        currentCycleRange.end
+      ),
+    [leftoverWithdrawals, currentCycleRange]
+  );
+  const effectivePaycheck =
+    currentPaycheck !== null ? currentPaycheck + leftoverWithdrawnThisCycle : null;
+
+  const remaining = effectivePaycheck !== null ? effectivePaycheck - periodTotal : null;
   const pctSpent =
-    currentPaycheck !== null && currentPaycheck > 0 ? (periodTotal / currentPaycheck) * 100 : 0;
+    effectivePaycheck !== null && effectivePaycheck > 0
+      ? (periodTotal / effectivePaycheck) * 100
+      : 0;
 
   const amountValue = parseFloat(amountText);
   const hasValidAmount = !Number.isNaN(amountValue) && amountValue > 0;
@@ -499,11 +517,17 @@ export default function QuickLogScreen() {
                       </Text>
                       <Text style={styles.bannerSub}>
                         {remaining >= 0
-                          ? `Remaining of ${formatPeso(currentPaycheck)} paycheck`
+                          ? `Remaining of ${formatPeso(effectivePaycheck!)} paycheck`
                           : `${formatPeso(Math.abs(remaining))} over your ${formatPeso(
-                              currentPaycheck
+                              effectivePaycheck!
                             )} paycheck`}
                       </Text>
+                      {leftoverWithdrawnThisCycle > 0 && (
+                        <Text style={styles.bannerLeftoverNote}>
+                          🧮 Includes {formatPeso(leftoverWithdrawnThisCycle)} withdrawn from
+                          Leftover Budget
+                        </Text>
+                      )}
                       <View style={styles.progressTrack}>
                         <View
                           style={[
@@ -772,6 +796,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   bannerTotal: { color: '#FFFFFF', fontSize: 30, fontWeight: '800', marginTop: 6 },
   bannerTotalDanger: { color: '#FF9B9B' },
   bannerSub: { color: '#9FB2D6', fontSize: 12, marginTop: 2 },
+  bannerLeftoverNote: { color: '#9FB2D6', fontSize: 11, marginTop: 4 },
   progressTrack: {
     height: 6,
     borderRadius: 3,

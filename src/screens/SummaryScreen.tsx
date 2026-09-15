@@ -404,6 +404,7 @@ export default function SummaryScreen() {
         currentCycleRange={currentCycleRange}
         paychecks={paychecks}
         categories={categories}
+        leftoverWithdrawals={leftoverWithdrawals}
         onClose={() => setCycleHistoryVisible(false)}
       />
 

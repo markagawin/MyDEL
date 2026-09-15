@@ -1,4 +1,4 @@
-import { CycleRange, Transaction } from './types';
+import { CycleRange, LeftoverWithdrawal, Transaction } from './types';
 import { endOfDay, parseCycleIdentifier, startOfDay } from './cycleEngine';
 import { getAvailableCycles } from './cycleList';
 import { isSavingsTransaction, savingsSignedAmount } from './savings';
@@ -62,6 +62,25 @@ export function computePastCycleRemainings(
 
 export function computeTotalLeftover(rows: CycleRemainingRow[]): number {
   return rows.reduce((sum, r) => sum + r.remaining, 0);
+}
+
+/** How much was withdrawn from the Leftover Budget pool during one cycle's date range — a
+ * withdrawal boosts the spendable budget of whichever cycle its own date falls into (typically
+ * the current one), never more than once, so it's never double-counted or perpetually carried
+ * into every future cycle. */
+export function computeLeftoverWithdrawnInRange(
+  withdrawals: LeftoverWithdrawal[],
+  rangeStart: Date,
+  rangeEnd: Date
+): number {
+  const fromTime = startOfDay(rangeStart).getTime();
+  const toTime = endOfDay(rangeEnd).getTime();
+  return withdrawals
+    .filter((w) => {
+      const time = new Date(w.timestamp).getTime();
+      return time >= fromTime && time <= toTime;
+    })
+    .reduce((sum, w) => sum + w.amount, 0);
 }
 
 export interface CycleOutflowPoint {
