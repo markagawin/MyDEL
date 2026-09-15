@@ -74,6 +74,7 @@ export default function QuickLogScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastUndoId, setToastUndoId] = useState<string | null>(null);
   const amountInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -284,6 +285,7 @@ export default function QuickLogScreen() {
     setAmountBlurred(false);
     setEntryDate(new Date());
     amountInputRef.current?.blur();
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
 
     const newId = addTransaction({
       amount: loggedAmount,
@@ -435,6 +437,7 @@ export default function QuickLogScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
