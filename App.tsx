@@ -73,6 +73,7 @@ function Tabs() {
   const theme = useTheme();
   return (
     <Tab.Navigator
+      backBehavior="none"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: theme.navy,
