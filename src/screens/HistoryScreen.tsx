@@ -140,7 +140,17 @@ export default function HistoryScreen() {
             onPress={() => setCategoryFilterVisible(true)}
           >
             <Text style={styles.filterText}>{categoryFilterLabel}</Text>
-            <Text style={styles.filterChevron}>▾</Text>
+            {selectedCategoryKeys.size > 0 ? (
+              <TouchableOpacity
+                accessibilityLabel="Clear category filter"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => setSelectedCategoryKeys(new Set())}
+              >
+                <Text style={styles.filterChevron}>✕</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.filterChevron}>▾</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
