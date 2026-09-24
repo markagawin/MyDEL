@@ -14,6 +14,7 @@ import { borrowActionOf, isBorrowTransaction } from '../borrow';
 import { Transaction } from '../types';
 import { AppTheme, useTheme } from '../theme';
 import CyclePickerModal from '../components/CyclePickerModal';
+import CategoryFilterModal from '../components/CategoryFilterModal';
 import CustomRangeBar from '../components/CustomRangeBar';
 import ViewModeToggle, { ViewMode } from '../components/ViewModeToggle';
 import ConfirmModal from '../components/ConfirmModal';
@@ -46,6 +47,8 @@ export default function HistoryScreen() {
   const [customStart, setCustomStart] = useState<Date>(currentCycleRange.start);
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [categoryFilterVisible, setCategoryFilterVisible] = useState(false);
+  const [selectedCategoryKeys, setSelectedCategoryKeys] = useState<Set<string>>(new Set());
 
   // If the user hasn't manually browsed to a past period, keep following "current"
   // as its identifier shifts (e.g. after a payday cycle settings change).
@@ -68,8 +71,17 @@ export default function HistoryScreen() {
   const activeOption = cycleOptions.find((o) => o.identifier === selectedCycle) ?? cycleOptions[0];
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
 
+  const categoryFilterLabel = useMemo(() => {
+    if (selectedCategoryKeys.size === 0) return 'All Categories';
+    if (selectedCategoryKeys.size === 1) {
+      const [key] = selectedCategoryKeys;
+      return `${categoryMap[key]?.icon ?? ''} ${categoryMap[key]?.label ?? 'Other'}`.trim();
+    }
+    return `${selectedCategoryKeys.size} categories`;
+  }, [selectedCategoryKeys, categoryMap]);
+
   const sections = useMemo(() => {
-    const filtered =
+    const filtered = (
       viewMode === 'cycle'
         ? transactions.filter((t) => t.cycleIdentifier === selectedCycle)
         : transactions.filter((t) => {
@@ -77,7 +89,8 @@ export default function HistoryScreen() {
             return (
               time >= startOfDay(customStart).getTime() && time <= endOfDay(customEnd).getTime()
             );
-          });
+          })
+    ).filter((t) => selectedCategoryKeys.size === 0 || selectedCategoryKeys.has(t.category));
     const groups = new Map<string, { title: string; sortKey: number; data: Transaction[] }>();
     for (const tx of filtered) {
       const date = new Date(tx.timestamp);
@@ -95,28 +108,37 @@ export default function HistoryScreen() {
           (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         ),
       }));
-  }, [transactions, selectedCycle, viewMode, customStart, customEnd]);
+  }, [transactions, selectedCycle, viewMode, customStart, customEnd, selectedCategoryKeys]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>History</Text>
         <ViewModeToggle mode={viewMode} onChange={setViewMode} />
-        {viewMode === 'cycle' ? (
-          <TouchableOpacity style={styles.filterButton} onPress={() => setPickerVisible(true)}>
-            <Text style={styles.filterText}>{activeOption?.label ?? 'Select period'}</Text>
+        <View style={styles.filterRow}>
+          {viewMode === 'cycle' ? (
+            <TouchableOpacity style={styles.filterButton} onPress={() => setPickerVisible(true)}>
+              <Text style={styles.filterText}>{activeOption?.label ?? 'Select period'}</Text>
+              <Text style={styles.filterChevron}>▾</Text>
+            </TouchableOpacity>
+          ) : (
+            <CustomRangeBar
+              start={customStart}
+              end={customEnd}
+              onChange={(s, e) => {
+                setCustomStart(s);
+                setCustomEnd(e);
+              }}
+            />
+          )}
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setCategoryFilterVisible(true)}
+          >
+            <Text style={styles.filterText}>{categoryFilterLabel}</Text>
             <Text style={styles.filterChevron}>▾</Text>
           </TouchableOpacity>
-        ) : (
-          <CustomRangeBar
-            start={customStart}
-            end={customEnd}
-            onChange={(s, e) => {
-              setCustomStart(s);
-              setCustomEnd(e);
-            }}
-          />
-        )}
+        </View>
       </View>
 
       {sections.length === 0 ? (
@@ -204,6 +226,14 @@ export default function HistoryScreen() {
         onClose={() => setPickerVisible(false)}
       />
 
+      <CategoryFilterModal
+        visible={categoryFilterVisible}
+        categories={categories}
+        selectedKeys={selectedCategoryKeys}
+        onChange={setSelectedCategoryKeys}
+        onClose={() => setCategoryFilterVisible(false)}
+      />
+
       <ConfirmModal
         visible={pendingDelete !== null}
         title="Delete entry?"
@@ -242,6 +272,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     paddingBottom: 12,
   },
   headerTitle: { fontSize: 24, fontWeight: '800', color: theme.navy, marginBottom: 10 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
