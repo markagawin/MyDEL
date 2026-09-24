@@ -8,7 +8,7 @@ import { formatPeso } from '../currency';
 import { endOfDay, formatFullDate, formatTimeOfDay, startOfDay } from '../cycleEngine';
 import { getAvailableCycles } from '../cycleList';
 import { isSavingsTransaction, savingsActionOf } from '../savings';
-import { isCreditCardPayment, isCreditPurchase } from '../creditCard';
+import { CREDIT_CARD_CATEGORY_KEY, isCreditCardPayment, isCreditPurchase } from '../creditCard';
 import { isLendingTransaction, lendingActionOf } from '../lending';
 import { borrowActionOf, isBorrowTransaction } from '../borrow';
 import { Transaction } from '../types';
@@ -90,7 +90,11 @@ export default function HistoryScreen() {
               time >= startOfDay(customStart).getTime() && time <= endOfDay(customEnd).getTime()
             );
           })
-    ).filter((t) => selectedCategoryKeys.size === 0 || selectedCategoryKeys.has(t.category));
+    ).filter((t) => {
+      if (selectedCategoryKeys.size === 0) return true;
+      if (selectedCategoryKeys.has(t.category)) return true;
+      return selectedCategoryKeys.has(CREDIT_CARD_CATEGORY_KEY) && isCreditPurchase(t);
+    });
     const groups = new Map<string, { title: string; sortKey: number; data: Transaction[] }>();
     for (const tx of filtered) {
       const date = new Date(tx.timestamp);
